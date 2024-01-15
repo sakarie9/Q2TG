@@ -159,19 +159,7 @@ export default class DeleteMessageService {
       });
       if (!message) return;
       if (this.lock(`tg-${pair.tgId}-${message.tgMsgId}`)) return;
-      if ((pair.flags | this.instance.flags) & flags.NO_DELETE_MESSAGE) {
-        await pair.tg.editMessages({
-          message: message.tgMsgId,
-          text: `<del>${message.tgMessageText}</del>\n<i>此消息已删除</i>`,
-          parseMode: 'html',
-        });
-      }
-      else {
-        await pair.tg.deleteMessages(message.tgMsgId);
-        await db.message.delete({
-          where: { id: message.id },
-        });
-      }
+      await pair.tg.sendMessage({ message: `该消息已被撤回`, replyTo: message.tgMsgId })
     }
     catch (e) {
       this.log.error('处理 QQ 消息撤回失败', e);
