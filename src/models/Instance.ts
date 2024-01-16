@@ -23,6 +23,8 @@ import { QqBot } from '@prisma/client';
 import StatusReportController from '../controllers/StatusReportController';
 import HugController from '../controllers/HugController';
 import QuotLyController from '../controllers/QuotLyController';
+import MiraiSkipFilterController from '../controllers/MiraiSkipFilterController';
+import env from './env';
 
 export default class Instance {
   private _owner = 0;
@@ -55,6 +57,7 @@ export default class Instance {
   private statusReportController: StatusReportController;
   private hugController: HugController;
   private quotLyController: QuotLyController;
+  private miraiSkipFilterController: MiraiSkipFilterController;
 
   private constructor(public readonly id: number) {
     this.log = getLogger(`Instance - ${this.id}`);
@@ -94,7 +97,7 @@ export default class Instance {
       this.tgBot = await Telegram.connect(this._botSessionId);
     }
     else {
-      const token = this.id === 0 ? process.env.TG_BOT_TOKEN : botToken;
+      const token = this.id === 0 ? env.TG_BOT_TOKEN : botToken;
       if (!token) {
         throw new Error('botToken 未指定');
       }
@@ -149,6 +152,7 @@ export default class Instance {
       this.requestController = new RequestController(this, this.tgBot, this.oicq);
       this.configController = new ConfigController(this, this.tgBot, this.tgUser, this.oicq);
       this.deleteMessageController = new DeleteMessageController(this, this.tgBot, this.tgUser, this.oicq);
+      this.miraiSkipFilterController = new MiraiSkipFilterController(this, this.tgBot, this.tgUser, this.oicq);
       this.inChatCommandsController = new InChatCommandsController(this, this.tgBot, this.tgUser, this.oicq);
       if (this.workMode === 'group') {
         this.hugController = new HugController(this, this.tgBot, this.oicq);
