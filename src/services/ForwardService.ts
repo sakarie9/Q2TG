@@ -42,6 +42,7 @@ import { escapeXml } from 'icqq/lib/common';
 import Docker from 'dockerode';
 import ReplyKeyboardHide = Api.ReplyKeyboardHide;
 import env from '../models/env';
+import { CustomFile } from 'telegram/client/uploads';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 
@@ -93,7 +94,11 @@ export default class ForwardService {
   public async forwardFromQq(event: PrivateMessageEvent | GroupMessageEvent, pair: Pair) {
     try {
       const tempFiles: FileResult[] = [];
-      let message = '', files: FileLike[] = [], buttons: ButtonLike[] = [], replyTo = 0;
+      let message = '',
+        files: FileLike[] = [],
+        buttons: ButtonLike[] = [],
+        replyTo = 0,
+        forceDocument = false;
       let messageHeader = '', sender = '';
       if (event.message_type === 'group') {
         // 产生头部，这和工作模式没有关系
@@ -111,7 +116,7 @@ export default class ForwardService {
         }
       };
       const useForward = async (resId: string) => {
-        if(env.CRV_API) {
+        if (env.CRV_API) {
           try {
             const messages = await pair.qq.getForwardMsg(resId);
             message = helper.generateForwardBrief(messages);
@@ -192,7 +197,12 @@ export default class ForwardService {
                 useSticker(await convert.webp(elem.file as string, () => fetchFile(elem.url)));
               }
               else {
-                files.push(await helper.downloadToCustomFile(url, !(message || messageHeader)));
+                const file = await helper.downloadToCustomFile(url, !(message || messageHeader));
+                files.push(file);
+                if (file instanceof CustomFile && elem.type === 'image' && file.size > 10 * 1024 * 1024) {
+                  this.log.info('强制使用文件发送');
+                  forceDocument = true;
+                }
                 buttons.push(Button.url(`${emoji.picture()} 查看原图`, url));
               }
             }
@@ -222,7 +232,12 @@ export default class ForwardService {
               }
               this.log.info('正在发送媒体，长度', helper.hSize(elem.size));
               try {
-                files.push(await helper.downloadToCustomFile(url, !(message || messageHeader), elem.name));
+                const file = await helper.downloadToCustomFile(url, !(message || messageHeader), elem.name);
+                if (file instanceof CustomFile && file.size > 10 * 1024 * 1024) {
+                  this.log.info('强制使用文件发送');
+                  forceDocument = true;
+                }
+                files.push(file);
               }
               catch (e) {
                 this.log.error('下载媒体失败', e);
@@ -359,7 +374,9 @@ export default class ForwardService {
       }
 
       // 发送消息
-      const messageToSend: SendMessageParams = {};
+      const messageToSend: SendMessageParams = {
+        forceDocument: forceDocument as any, // 恼
+      };
       message && (messageToSend.message = message);
       if (files.length === 1) {
         messageToSend.file = files[0];
