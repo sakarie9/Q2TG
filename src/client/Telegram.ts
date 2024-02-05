@@ -62,7 +62,7 @@ export default class Telegram {
         connection: env.TG_CONNECTION === 'websocket' ? ConnectionTCPObfuscated : ConnectionTCPFull,
       },
     );
-    // this.client.logger.setLevel(LogLevel.WARN);
+    this.client.logger.setLevel(LogLevel.DEBUG);
   }
 
   public static async create(startArgs: UserAuthParams | BotAuthParams, appName = 'Q2TG') {

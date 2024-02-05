@@ -59,6 +59,7 @@ export default class ForwardService {
               private readonly tgBot: Telegram,
               private readonly oicq: OicqClient) {
     this.log = getLogger(`ForwardService - ${instance.id}`);
+    this.log.level = "debug"
     if (env.ZINC_URL) {
       this.zincSearch = new ZincSearch({
         url: env.ZINC_URL,
