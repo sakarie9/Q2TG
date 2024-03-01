@@ -186,8 +186,14 @@ export default class ForwardService {
             if ('url' in elem)
               url = elem.url;
             try {
-              if (elem.type === 'image' && elem.asface
-                && !(elem.file as string).toLowerCase().endsWith('.gif')
+              if ((elem.file as string).toLowerCase().endsWith('.gif')) {
+                // gif
+                files.push(await helper.downloadToCustomFile(url, !(message || messageHeader)));
+                if (event.message_type === 'group') {
+                  buttons.push(Button.url(`${sender}:`, url));
+                  messageHeader = '';
+                }
+              } else if (elem.type === 'image' && elem.asface
                 // 同时存在文字消息就不作为 sticker 发送
                 && !event.message.some(it => it.type === 'text')
                 // 防止在 TG 中一起发送多个 sticker 失败
