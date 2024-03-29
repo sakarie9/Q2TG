@@ -95,3 +95,16 @@ index de3a1d116c794ae2ee9e18836d6669a4d89d59d0..9c6c5c1fc5949eb49636d539aed4ed14
      /** 一种特殊消息(官方客户端无法解析) */
      mirai(data) {
          return {
+diff --git a/lib/message/parser.js b/lib/message/parser.js
+index f661775a1fb146fefcbb8db73cfa62fba4d737f4..c3d2bd9f295e6cc3d5c0a505b3d90f8c007e3cea 100644
+--- a/lib/message/parser.js
++++ b/lib/message/parser.js
+@@ -58,7 +58,7 @@ class Parser {
+                 this.content = elem.data;
+                 break;
+             case 3: //flash
+-                elem = this.parseNewImgElem(proto, "flash");
++                elem = this.parseImgElem(type, proto, "flash");
+                 brief = "闪照";
+                 this.content = `{flash:${elem.file.slice(0, 32).toUpperCase()}}`;
+                 break;
