@@ -147,7 +147,14 @@ export default class ForwardService {
           message = '[<i>转发多条消息（未配置）</i>]';
         }
       };
-      for (const elem of event.message) {
+      for (let elem of event.message) {
+        if (elem.type === 'flash' && (pair.flags | this.instance.flags) & flags.NO_FLASH_PIC) {
+          message += '<i>[闪照]</i>';
+          elem = {
+            ...elem,
+            type: 'image',
+          };
+        }
         let url: string;
         switch (elem.type) {
           case 'text': {
@@ -390,8 +397,8 @@ export default class ForwardService {
         messageToSend.file = files;
       }
       else if (event.message_type === 'group' && (pair.flags | this.instance.flags) & flags.RICH_HEADER && env.WEB_ENDPOINT
-      // 当消息包含链接时不显示 RICH HEADER
-      && !isContainsUrl(message)) {
+        // 当消息包含链接时不显示 RICH HEADER
+        && !isContainsUrl(message)) {
         // 没有文件时才能显示链接预览
         richHeaderUsed = true;
         // https://github.com/tdlib/td/blob/437c2d0c6e0ad104022d5ad86ddc8aedc41cb7a8/td/telegram/MessageContent.cpp#L2575
