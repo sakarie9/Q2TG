@@ -203,6 +203,7 @@ export default {
   },
 
   generateTelegramAvatarUrl(instanceId: number, userId: number) {
+    if (!env.WEB_ENDPOINT) return '';
     const url = new URL(`${env.WEB_ENDPOINT}/telegramAvatar/${instanceId}/${userId}`);
     return url.toString();
   },
