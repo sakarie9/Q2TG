@@ -5,11 +5,11 @@
     "build": "pnpm run --stream --parallel build"
   },
   "devDependencies": {
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.5"
   },
   "pnpm": {
     "patchedDependencies": {
-      "@icqqjs/icqq@1.1.3": "patches/@icqqjs__icqq@1.1.3.patch"
+      "@icqqjs/icqq@1.2.0": "patches/@icqqjs__icqq@1.2.0.patch"
     }
   }
 }

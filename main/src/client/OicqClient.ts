@@ -229,15 +229,4 @@ export default class OicqClient extends Client {
       resid,
     };
   }
-
-  public async makeLongMsg(message: Sendable): Promise<LongMsgElem> {
-    const forward = await this.makeForwardMsgSelf({
-      message,
-      user_id: this.uin,
-    });
-    return {
-      type: 'longmsg',
-      resId: forward.resid,
-    };
-  }
 }

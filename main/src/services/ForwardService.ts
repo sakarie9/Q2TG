@@ -806,7 +806,7 @@ export default class ForwardService {
         let messageToSend: Sendable = chainableElements;
         if (chainableElements.some(it => typeof it === 'object' && it.type === 'markdown')) {
           this.log.debug(chainableElements);
-          messageToSend = await this.instance.oicq.makeLongMsg(chainableElements);
+          messageToSend = await pair.qq.uploadLongMsg(chainableElements);
         }
         qqMessages.push({
           ...await pair.qq.sendMsg(messageToSend, source),
