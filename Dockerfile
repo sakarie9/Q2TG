@@ -29,7 +29,9 @@ COPY main/src main/tsconfig.json /app/main/
 COPY main/prisma /app/main/
 RUN cd main && pnpm exec prisma generate
 RUN cd main && pnpm run build
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked pnpm deploy --filter=q2tg-main --prod deploy
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
+    --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    pnpm deploy --filter=q2tg-main --prod deploy
 
 FROM debian:bookworm-slim AS tgs-to-gif-build
 ADD https://github.com/conan-io/conan/releases/download/1.61.0/conan-ubuntu-64.deb /tmp/conan.deb
