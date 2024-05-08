@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@icqqjs/icqq@1.2.0':
-    hash: c76wgceu6sitx4yhmgukfhsioq
+    hash: 6yho2mmridqmfssxk3qnzdaelu
     path: patches/@icqqjs__icqq@1.2.0.patch
 
 importers:
@@ -27,7 +27,7 @@ importers:
         version: 7.0.3
       '@icqqjs/icqq':
         specifier: 1.2.0
-        version: 1.2.0(patch_hash=c76wgceu6sitx4yhmgukfhsioq)
+        version: 1.2.0(patch_hash=6yho2mmridqmfssxk3qnzdaelu)
       '@prisma/client':
         specifier: 5.13.0
         version: 5.13.0(prisma@5.13.0)
@@ -102,7 +102,7 @@ importers:
         version: 0.2.2
       telegram:
         specifier: https://github.com/clansty/gramjs/releases/download/2.19.10%2Brevert_media/telegram-2.19.10.tgz
-        version: '@github.com/clansty/gramjs/releases/download/2.19.10%252525252Brevert_media/telegram-2.19.10.tgz'
+        version: '@github.com/clansty/gramjs/releases/download/2.19.10%25252525252Brevert_media/telegram-2.19.10.tgz'
       tmp-promise:
         specifier: ^3.0.3
         version: 3.0.3
@@ -805,7 +805,7 @@ packages:
       glob: 10.3.12
     dev: false
 
-  /@icqqjs/icqq@1.2.0(patch_hash=c76wgceu6sitx4yhmgukfhsioq):
+  /@icqqjs/icqq@1.2.0(patch_hash=6yho2mmridqmfssxk3qnzdaelu):
     resolution: {integrity: sha512-/BypCM8jlQC2OtoyVuf6aYuMBNJ122zez5gt4MOTsEetCrouxX1zVE2yGv6bbAOkzFA4JuMnwrIJL+pr2hP2ag==, tarball: https://npm.pkg.github.com/download/@icqqjs/icqq/1.2.0/a2f26dae19b894a37865e730fc639e251f169d17}
     engines: {node: '>= v14'}
     dependencies:
@@ -5747,7 +5747,7 @@ packages:
       - utf-8-validate
     dev: false
 
-  '@github.com/clansty/gramjs/releases/download/2.19.10%252525252Brevert_media/telegram-2.19.10.tgz':
+  '@github.com/clansty/gramjs/releases/download/2.19.10%25252525252Brevert_media/telegram-2.19.10.tgz':
     resolution: {tarball: https://github.com/clansty/gramjs/releases/download/2.19.10%2Brevert_media/telegram-2.19.10.tgz}
     name: telegram
     version: 2.19.10
