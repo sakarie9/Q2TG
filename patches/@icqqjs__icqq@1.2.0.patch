@@ -1,8 +1,8 @@
 diff --git a/lib/common.d.ts b/lib/common.d.ts
-index d27f6298a041607768ee58b0d1e75c8bdcedafe1..a31f71a429a8395f727793e8f14445bf3b502a0c 100644
+index d27f6298a041607768ee58b0d1e75c8bdcedafe1..d4d90b2ef8b63baf1edb84b0ab3118bbf421c515 100644
 --- a/lib/common.d.ts
 +++ b/lib/common.d.ts
-@@ -54,5 +54,10 @@ export interface UserProfile {
+@@ -54,5 +54,11 @@ export interface UserProfile {
      signature: string;
      /** 自定义的QID */
      QID: string;
@@ -11,13 +11,14 @@ index d27f6298a041607768ee58b0d1e75c8bdcedafe1..a31f71a429a8395f727793e8f14445bf
 +    province: string;
 +    city: string;
 +    email: string;
++    birthday: [number, number, number];
  }
  export * from "./core/constants";
 diff --git a/lib/internal/internal.js b/lib/internal/internal.js
-index ee137c44c92b947dcc7d851bb04f319c9a070f68..6d129f1dada9e2af13b7bb5282eeafbefab816be 100644
+index ee137c44c92b947dcc7d851bb04f319c9a070f68..4bb7d5d082156f76974269e220051539162792dd 100644
 --- a/lib/internal/internal.js
 +++ b/lib/internal/internal.js
-@@ -86,6 +86,11 @@ async function getUserProfile(uin = this.uin) {
+@@ -86,9 +86,17 @@ async function getUserProfile(uin = this.uin) {
      });
      // 有需要自己加！
      return {
@@ -28,7 +29,14 @@ index ee137c44c92b947dcc7d851bb04f319c9a070f68..6d129f1dada9e2af13b7bb5282eeafbe
 +        email: String(profile[20011]),
          signature: String(profile[102]),
          regTimestamp: profile[20026],
-         QID: String(profile[27394])
+-        QID: String(profile[27394])
++        QID: String(profile[27394]),
++        birthday: profile[20031].toBuffer().length === 4 ? 
++            [profile[20031].toBuffer().slice(0,2).readUInt16BE(), profile[20031].toBuffer().slice(2,3).readUInt8(), profile[20031].toBuffer().slice(3).readUInt8()] :
++            undefined,
+     };
+ }
+ exports.getUserProfile = getUserProfile;
 diff --git a/lib/message/converter.js b/lib/message/converter.js
 index 27a659a3290fadd990a1a980918515a6ded4978f..d6156587a02b1ed441ac8d2a3e2104e6343306b2 100644
 --- a/lib/message/converter.js

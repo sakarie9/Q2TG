@@ -111,6 +111,12 @@
         <% if(location) { %>
             <div class="secondary"><%= location %></div>
         <% } %>
+        <% if(birthday) { %>
+            <div class="detailItem">
+                <div class="secondary">生日</div>
+                <%= birthday %>
+            </div>
+        <% } %>
         <div class="detailItem">
             <div class="secondary">加入时间</div>
             <%= joinTime %>

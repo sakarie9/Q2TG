@@ -39,6 +39,7 @@ export default ((fastify, opts, done) => {
       email: profile.email,
       qid: profile.QID,
       signature: profile.signature,
+      birthday: (profile.birthday || []).join('/'),
     });
   });
 
