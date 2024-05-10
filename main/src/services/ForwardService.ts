@@ -705,10 +705,11 @@ export default class ForwardService {
 
       // 处理回复
       let source: Quotable;
-      if (message.replyToMsgId) {
+      if (message.replyToMsgId || message.replyTo) {
         markdownCompatible = false;
         try {
-          const quote = await db.message.findFirst({
+          console.log(message.replyTo)
+          const quote = message.replyToMsgId && await db.message.findFirst({
             where: {
               tgChatId: Number(pair.tg.id),
               tgMsgId: message.replyToMsgId,
@@ -717,7 +718,7 @@ export default class ForwardService {
           });
           if (quote) {
             source = {
-              message: quote.brief || ' ',
+              message: message.replyTo?.quoteText || quote.brief || ' ',
               seq: quote.seq,
               rand: Number(quote.rand),
               user_id: Number(quote.qqSenderId),
@@ -726,7 +727,7 @@ export default class ForwardService {
           }
           else {
             source = {
-              message: '回复消息找不到',
+              message: message.replyTo?.quoteText || '回复消息找不到',
               seq: 1,
               time: Math.floor(new Date().getTime() / 1000),
               rand: 1,
