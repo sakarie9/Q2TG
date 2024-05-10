@@ -38,7 +38,7 @@ index ee137c44c92b947dcc7d851bb04f319c9a070f68..4bb7d5d082156f76974269e220051539
  }
  exports.getUserProfile = getUserProfile;
 diff --git a/lib/message/converter.js b/lib/message/converter.js
-index 27a659a3290fadd990a1a980918515a6ded4978f..d6156587a02b1ed441ac8d2a3e2104e6343306b2 100644
+index 27a659a3290fadd990a1a980918515a6ded4978f..e1bbe1470f302c30e7adea92f433a6e3929064e3 100644
 --- a/lib/message/converter.js
 +++ b/lib/message/converter.js
 @@ -111,7 +111,7 @@ class Converter {
@@ -58,3 +58,14 @@ index 27a659a3290fadd990a1a980918515a6ded4978f..d6156587a02b1ed441ac8d2a3e2104e6
          if (dummy)
              return this._text(display);
          const buf = Buffer.allocUnsafe(6);
+@@ -535,10 +534,6 @@ class Converter {
+     quote(source) {
+         const elems = new Converter(source.message || "", this.ext).elems;
+         const tmp = this.brief;
+-        if (!this.ext?.dm) {
+-            this.at({ type: "at", qq: source.user_id });
+-            this.elems.unshift(this.elems.pop());
+-        }
+         this.elems.unshift({
+             45: {
+                 1: [source.seq],
