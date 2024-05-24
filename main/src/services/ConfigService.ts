@@ -174,8 +174,8 @@ export default class ConfigService {
       // 添加到 Filter
       try {
         status && await status.edit({ text: '正在将群添加到文件夹…' });
-        const dialogFilters = await this.tgUser.getDialogFilters() as Api.DialogFilter[];
-        const filter = dialogFilters.find(e => e.id === DEFAULT_FILTER_ID);
+        const dialogFilters = await this.tgUser.getDialogFilters();
+        const filter = dialogFilters.filters.find(e => e instanceof Api.DialogFilter && e.id === DEFAULT_FILTER_ID) as Api.DialogFilter;
         if (filter) {
           filter.includePeers.push(utils.getInputPeer(chat));
           await this.tgUser.updateDialogFilter({
@@ -278,8 +278,8 @@ export default class ConfigService {
 
   // 创建 QQ 群组的文件夹
   public async setupFilter() {
-    const result = await this.tgUser.getDialogFilters() as Api.DialogFilter[];
-    let filter = result.find(e => e.id === DEFAULT_FILTER_ID);
+    const result = await this.tgUser.getDialogFilters();
+    let filter = result.filters.find(e => e instanceof Api.DialogFilter && e.id === DEFAULT_FILTER_ID);
     if (!filter) {
       this.log.info('创建 TG 文件夹');
       // 要自己计算新的 id，随意 id 也是可以的
