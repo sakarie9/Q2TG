@@ -50,6 +50,7 @@ import probe from 'probe-image-size';
 import markdownEscape from 'markdown-escape';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
+const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
 
 // noinspection FallThroughInSwitchStatementJS
 export default class ForwardService {
@@ -489,7 +490,7 @@ export default class ForwardService {
       markdown.push(`![头像 #30px#30px](${helper.generateTelegramAvatarUrl(this.instance.id, senderId)}) **${messageHeader}**`);
       messageHeader += ': \n';
       if ((pair.flags | this.instance.flags) & flags.COLOR_EMOJI_PREFIX) {
-        messageHeader = emoji.tgColor((message.sender as Api.User)?.color || message.senderId.toJSNumber()) + messageHeader;
+        messageHeader = emoji.tgColor((message.sender as Api.User)?.color?.color || message.senderId.toJSNumber()) + messageHeader;
       }
 
       const useImage = (image: Buffer, asface: boolean) => {
@@ -515,7 +516,7 @@ export default class ForwardService {
 
       if (message.photo instanceof Api.Photo ||
         // stickers 和以文件发送的图片都是这个
-        message.document?.mimeType?.startsWith('image/')) {
+        IMAGE_MIMES.includes(message.document?.mimeType)) {
         if ('spoiler' in message.media && message.media.spoiler) {
           isSpoilerPhoto = true;
           const msgList: Forwardable[] = [{
@@ -708,7 +709,7 @@ export default class ForwardService {
       if (message.replyToMsgId || message.replyTo) {
         markdownCompatible = false;
         try {
-          console.log(message.replyTo)
+          console.log(message.replyTo);
           const quote = message.replyToMsgId && await db.message.findFirst({
             where: {
               tgChatId: Number(pair.tg.id),
