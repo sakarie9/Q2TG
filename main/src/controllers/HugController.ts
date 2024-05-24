@@ -8,6 +8,7 @@ import db from '../models/db';
 import BigInteger from 'big-integer';
 import helper from '../helpers/forwardHelper';
 import { getLogger, Logger } from 'log4js';
+import flags from '../constants/flags';
 
 type ActionSubjectTg = {
   name: string;
@@ -40,6 +41,7 @@ export default class {
     if (event.message_type !== 'group') return;
     const pair = this.instance.forwardPairs.find(event.group);
     if (!pair) return;
+    if ((pair.flags | this.instance.flags) & flags.DISABLE_SLASH_COMMAND) return;
     const chain = [...event.message];
     while (chain.length && chain[0].type !== 'text') {
       chain.shift();
@@ -108,6 +110,7 @@ export default class {
   private onTelegramMessage = async (message: Api.Message) => {
     const pair = this.instance.forwardPairs.find(message.chat);
     if (!pair) return;
+    if ((pair.flags | this.instance.flags) & flags.DISABLE_SLASH_COMMAND) return;
     const exec = COMMAND_REGEX.exec(message.message);
     if (!exec) return;
     const action = exec[2] || exec[3];
