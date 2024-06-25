@@ -490,7 +490,7 @@ export default class ForwardService {
       markdown.push(`![头像 #30px#30px](${helper.generateTelegramAvatarUrl(this.instance.id, senderId)}) **${messageHeader}**`);
       messageHeader += ': \n';
       if ((pair.flags | this.instance.flags) & flags.COLOR_EMOJI_PREFIX) {
-        messageHeader = emoji.tgColor((message.sender as Api.User)?.color || message.senderId.toJSNumber()) + messageHeader;
+        messageHeader = emoji.tgColor((message.sender as Api.User)?.color?.color || message.senderId.toJSNumber()) + messageHeader;
       }
 
       const useImage = (image: Buffer, asface: boolean) => {
