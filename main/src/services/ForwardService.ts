@@ -48,6 +48,7 @@ import BigInteger from 'big-integer';
 import { Image } from '@icqqjs/icqq/lib/message';
 import probe from 'probe-image-size';
 import markdownEscape from 'markdown-escape';
+import pastebin from '../utils/pastebin';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
@@ -98,8 +99,8 @@ export default class ForwardService {
   }
 
   public async forwardFromQq(event: PrivateMessageEvent | GroupMessageEvent, pair: Pair) {
+    const tempFiles: FileResult[] = [];
     try {
-      const tempFiles: FileResult[] = [];
       let message = '',
         files: FileLike[] = [],
         buttons: ButtonLike[] = [],
@@ -458,18 +459,32 @@ export default class ForwardService {
       if (this.instance.workMode === 'personal' && event.message_type === 'group' && event.atall) {
         await tgMessage.pin({ notify: false });
       }
-
-      tempFiles.forEach(it => it.cleanup());
       return { tgMessage, richHeaderUsed };
     }
     catch (e) {
       this.log.error('从 QQ 到 TG 的消息转发失败', e);
+      let pbUrl: string;
       try {
-        this.instance.workMode === 'personal' && await pair.tg.sendMessage('<i>有一条来自 QQ 的消息转发失败</i>');
+        pbUrl = await pastebin.upload(JSON.stringify({
+          error: e,
+          event,
+        }));
+      }
+      catch (e) {
+        this.log.error('上传到 Pastebin 失败', e);
+      }
+      try {
+        this.instance.workMode === 'personal' && await pair.tg.sendMessage({
+          message: '<i>有一条来自 QQ 的消息转发失败</i>',
+          buttons: pbUrl ? [[Button.url('查看详情', pbUrl)]] : [],
+        });
       }
       catch {
       }
       return {};
+    }
+    finally {
+      tempFiles.forEach(it => it.cleanup());
     }
   }
 
