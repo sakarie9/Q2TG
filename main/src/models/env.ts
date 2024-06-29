@@ -23,6 +23,7 @@ const configParsed = z.object({
   PROXY_PASSWORD: z.string().optional(),
   TGS_TO_GIF: z.string().default('tgs_to_gif'),
   CRV_API: z.string().url().optional(),
+  CRV_VIEWER_APP: z.string().url().startsWith('https://t.me/').optional(),
   CRV_KEY: z.string().optional(),
   ZINC_URL: z.string().url().optional(),
   ZINC_USERNAME: z.string().optional(),

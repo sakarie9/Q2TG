@@ -131,7 +131,8 @@ export default class ForwardService {
             const messages = await pair.qq.getForwardMsg(resId);
             message = helper.generateForwardBrief(messages);
             const hash = md5Hex(resId);
-            buttons.push(Button.url('📃查看', `${env.CRV_API}/?hash=${hash}`));
+            const viewerUrl = env.CRV_VIEWER_APP ? `${env.CRV_VIEWER_APP}?startapp=${hash}` : `${env.CRV_API}/?hash=${hash}`;
+            buttons.push(Button.url('📃查看', viewerUrl));
             // 传到 Cloudflare
             axios.post(`${env.CRV_API}/add`, {
               auth: env.CRV_KEY,
