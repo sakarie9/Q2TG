@@ -2,11 +2,12 @@ import Telegram from '../client/Telegram';
 import OicqClient from '../client/OicqClient';
 import ForwardService from '../services/ForwardService';
 import {
+  FaceElem,
   Friend,
   FriendPokeEvent,
   GroupMessageEvent,
   GroupPokeEvent,
-  MemberIncreaseEvent,
+  MemberIncreaseEvent, MessageElem,
   PrivateMessageEvent,
 } from '@icqqjs/icqq';
 import db from '../models/db';

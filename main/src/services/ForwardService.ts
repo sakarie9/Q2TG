@@ -1,5 +1,6 @@
 import Telegram from '../client/Telegram';
 import {
+  FaceElem,
   Forwardable,
   Group,
   GroupMessageEvent,
@@ -96,6 +97,38 @@ export default class ForwardService {
         });
       });
     }
+    this.initStickerPack().then(() => this.log.info('Sticker Pack 初始化完成'));
+  }
+
+  private readonly stickerPackMap: Record<keyof typeof lottie.packInfo, Api.Document[]> = {} as any;
+
+  private async initStickerPack() {
+    for (const handle of Object.keys(lottie.packInfo)) {
+      const pack = await this.tgBot.getStickerSet(handle);
+      this.stickerPackMap[handle] = pack.documents;
+    }
+  }
+
+  private getStickerByQQFaceId(id: number) {
+    for (const [pack, ids] of Object.entries(lottie.packInfo)) {
+      if (ids.includes(id as any)) {
+        if (this.stickerPackMap[pack])
+          return this.stickerPackMap[pack][ids.indexOf(id)] as Api.Document;
+      }
+    }
+  }
+
+  private getFaceByTgFileId(fileId: BigInteger.BigNumber): FaceElem | undefined {
+    for (const [pack, documents] of Object.entries(this.stickerPackMap)) {
+      for (const document of documents) {
+        if (document.id.eq(fileId))
+          return {
+            type: 'face',
+            id: lottie.packInfo[pack][documents.indexOf(document)],
+            stickerType: 1,
+          };
+      }
+    }
   }
 
   public async forwardFromQq(event: PrivateMessageEvent | GroupMessageEvent, pair: Pair) {
@@ -169,14 +202,7 @@ export default class ForwardService {
               instantViewUrl.searchParams.set('rhash', '45756f9b0bb3c6');
               message += `<a href="${instantViewUrl}">\u200e</a>`;
             }
-            // 判断 tgs 表情
-            let tgs = lottie.getTgsIndex(elem.text);
-            if (tgs === -1) {
-              message += helper.htmlEscape(elem.text);
-            }
-            else {
-              useSticker(`assets/tgs/tgs${tgs}.tgs`);
-            }
+            message += helper.htmlEscape(elem.text);
             break;
           }
           case 'at': {
@@ -188,6 +214,12 @@ export default class ForwardService {
             }
           }
           case 'face':
+            // 判断 tgs 表情
+            const tgs = this.getStickerByQQFaceId(elem.id as number);
+            if (tgs) {
+              useSticker(tgs);
+              break;
+            }
           case 'sface': {
             message += `[<i>${helper.htmlEscape(elem.text)}</i>]`;
             break;
@@ -597,8 +629,14 @@ export default class ForwardService {
       }
       else if (message.sticker) {
         // 一定是 tgs
-        const gifPath = await convert.tgs2gif(message.sticker.id.toString(16), () => message.downloadMedia({}));
-        useImage(await fsP.readFile(gifPath), true);
+        const face = this.getFaceByTgFileId(message.sticker.id);
+        if (face) {
+          chain.push(face);
+        }
+        else {
+          const gifPath = await convert.tgs2gif(message.sticker.id.toString(16), () => message.downloadMedia({}));
+          useImage(await fsP.readFile(gifPath), true);
+        }
         markdownCompatible = false;
         brief += '[贴纸]';
       }
