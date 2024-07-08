@@ -42,6 +42,7 @@ export default class ForwardController {
   }
 
   private onQqMessage = async (event: PrivateMessageEvent | GroupMessageEvent) => {
+    this.log.debug('收到 QQ 消息', event);
     try {
       const target = event.message_type === 'private' ? event.friend : event.group;
       const pair = this.instance.forwardPairs.find(target);

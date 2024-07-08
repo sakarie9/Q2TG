@@ -43,6 +43,7 @@ export default class {
     if (!pair) return;
     if ((pair.flags | this.instance.flags) & flags.DISABLE_SLASH_COMMAND) return;
     const chain = [...event.message];
+    if (chain.some(it => it.type === 'face')) return;
     while (chain.length && chain[0].type !== 'text') {
       chain.shift();
     }
