@@ -36,6 +36,7 @@ const configParsed = z.object({
   UI_PATH: z.string().optional(),
   UI_PROXY: z.string().url().optional(),
   WEB_ENDPOINT: z.string().url().optional(),
+  POSTHOG_OPTOUT: z.string().transform((v) => ['true', '1', 'yes'].includes(v.toLowerCase())).default('false'),
 }).safeParse(process.env);
 
 if (!configParsed.success) {

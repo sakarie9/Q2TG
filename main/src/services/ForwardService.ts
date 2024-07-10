@@ -46,10 +46,10 @@ import env from '../models/env';
 import { CustomFile } from 'telegram/client/uploads';
 import flags from '../constants/flags';
 import BigInteger from 'big-integer';
-import { Image } from '@icqqjs/icqq/lib/message';
 import probe from 'probe-image-size';
 import markdownEscape from 'markdown-escape';
 import pastebin from '../utils/pastebin';
+import posthog from '../models/posthog';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
@@ -173,9 +173,13 @@ export default class ForwardService {
               data: messages,
             })
               .then(data => this.log.trace('上传消息记录到 Cloudflare', data.data))
-              .catch(e => this.log.error('上传消息记录到 Cloudflare 失败', e));
+              .catch(e => {
+                this.log.error('上传消息记录到 Cloudflare 失败', e);
+                posthog.capture('上传消息记录到 Cloudflare 失败', { error: e });
+              });
           }
           catch (e) {
+            posthog.capture('转发多条消息（无法获取）', { error: e });
             message = '[<i>转发多条消息（无法获取）</i>]';
           }
         }
@@ -256,6 +260,7 @@ export default class ForwardService {
             }
             catch (e) {
               this.log.error('下载媒体失败', e);
+              posthog.capture('下载媒体失败', { error: e });
               // 下载失败让 Telegram 服务器下载
               files.push(url);
             }
@@ -289,6 +294,7 @@ export default class ForwardService {
               }
               catch (e) {
                 this.log.error('下载媒体失败', e);
+                posthog.capture('下载媒体失败', { error: e });
                 // 下载失败让 Telegram 服务器下载
                 files.push(url);
               }
@@ -358,6 +364,7 @@ export default class ForwardService {
                 }
                 catch (e) {
                   this.log.error('下载媒体失败', e);
+                  posthog.capture('下载媒体失败', { error: e });
                   // 下载失败让 Telegram 服务器下载
                   files.push(getImageUrlByMd5(result.md5));
                 }
@@ -410,6 +417,7 @@ export default class ForwardService {
         }
         catch (e) {
           this.log.error('查找回复消息失败', e);
+          posthog.capture('查找回复消息失败', { error: e });
           message += '\n\n<i>*查找回复消息失败</i>';
         }
       }
@@ -463,6 +471,7 @@ export default class ForwardService {
         if (richHeaderUsed) {
           richHeaderUsed = false;
           this.log.warn('Rich Header 发送错误', messageToSend.file, e);
+          posthog.capture('Rich Header 发送错误', { error: e, attach: messageToSend.file });
           delete messageToSend.file;
           delete messageToSend.linkPreview;
           message = messageHeader + (message && messageHeader ? '\n' : '') + message;
@@ -496,6 +505,7 @@ export default class ForwardService {
     }
     catch (e) {
       this.log.error('从 QQ 到 TG 的消息转发失败', e);
+      posthog.capture('从 QQ 到 TG 的消息转发失败', { error: e });
       let pbUrl: string;
       try {
         pbUrl = await pastebin.upload(JSON.stringify({
@@ -792,6 +802,7 @@ export default class ForwardService {
         }
         catch (e) {
           this.log.error('查找回复消息失败', e);
+          posthog.capture('查找回复消息失败', { error: e });
           source = {
             message: '查找回复消息失败',
             seq: 1,
@@ -838,6 +849,7 @@ export default class ForwardService {
         }
         catch (e) {
           this.log.error('使用 MapInstance 发送消息失败', e);
+          posthog.capture('使用 MapInstance 发送消息失败', { error: e });
         }
       }
 
@@ -884,6 +896,7 @@ export default class ForwardService {
     }
     catch (e) {
       this.log.error('从 TG 到 QQ 的消息转发失败', e);
+      posthog.capture('从 TG 到 QQ 的消息转发失败', { error: e });
       try {
         await message.reply({
           message: `<i>转发失败：${e.message}</i>`,
