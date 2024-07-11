@@ -67,25 +67,30 @@ export default class ForwardController {
       let { tgMessage, richHeaderUsed } = await this.forwardService.forwardFromQq(event, pair);
       if (!tgMessage) return;
       // 更新数据库
-      await db.message.create({
-        data: {
-          qqRoomId: pair.qqRoomId,
-          qqSenderId: event.sender.user_id,
-          time: event.time,
-          brief: event.raw_message,
-          seq: event.seq,
-          rand: event.rand,
-          pktnum: event.pktnum,
-          tgChatId: pair.tgId,
-          tgMsgId: tgMessage.id,
-          instanceId: this.instance.id,
-          tgMessageText: tgMessage.message,
-          tgFileId: forwardHelper.getMessageDocumentId(tgMessage),
-          nick: event.nickname,
-          tgSenderId: BigInt(this.tgBot.me.id.toString()),
-          richHeaderUsed,
-        },
-      });
+      // 库的类型有问题
+      let tgMessages = tgMessage as undefined as Api.Message[];
+      if (!Array.isArray(tgMessages)) tgMessages = [tgMessage];
+      for (const tgMessage of tgMessages) {
+        await db.message.create({
+          data: {
+            qqRoomId: pair.qqRoomId,
+            qqSenderId: event.sender.user_id,
+            time: event.time,
+            brief: event.raw_message,
+            seq: event.seq,
+            rand: event.rand,
+            pktnum: event.pktnum,
+            tgChatId: pair.tgId,
+            tgMsgId: tgMessage.id,
+            instanceId: this.instance.id,
+            tgMessageText: tgMessage.message,
+            tgFileId: forwardHelper.getMessageDocumentId(tgMessage),
+            nick: event.nickname,
+            tgSenderId: BigInt(this.tgBot.me.id.toString()),
+            richHeaderUsed,
+          },
+        });
+      }
       await this.forwardService.addToZinc(pair.dbId, tgMessage.id, {
         text: event.raw_message,
         nick: event.nickname,
