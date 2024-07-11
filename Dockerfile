@@ -72,5 +72,13 @@ COPY --from=build-front /app/ui/dist /app/front
 ENV UI_PATH=/app/front
 
 ENV DATA_DIR=/app/data
+
+ARG REPO
+ARG REF
+ARG COMMIT
+ENV REPO $REPO
+ENV REF $REF
+ENV COMMIT $COMMIT
+
 EXPOSE 8080
 CMD pnpm start

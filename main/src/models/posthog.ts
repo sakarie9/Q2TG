@@ -21,6 +21,10 @@ export default {
     if (typeof properties?.error === 'object' && properties.error.stack) {
       properties.error = properties.error.stack;
     }
+    properties.repo = env.REPO;
+    properties.ref = env.REF;
+    properties.commit = env.COMMIT;
+
     client.capture({
       event, properties,
       distinctId: hostname,
