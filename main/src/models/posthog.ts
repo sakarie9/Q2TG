@@ -18,6 +18,9 @@ else {
 
 export default {
   capture(event: string, properties: Record<string, any>) {
+    if (typeof properties?.error === 'object' && properties.error.stack) {
+      properties.error = properties.error.stack;
+    }
     client.capture({
       event, properties,
       distinctId: hostname,
