@@ -18,7 +18,7 @@ else {
 
 export default {
   capture(event: string, properties: Record<string, any>) {
-    if (typeof properties?.error === 'object' && properties.error.stack) {
+    if (typeof properties?.error === 'object' && properties.error.stack && JSON.stringify(properties.error) === '{}') {
       properties.error = properties.error.stack;
     }
     properties.repo = env.REPO;
