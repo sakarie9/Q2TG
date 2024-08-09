@@ -7,6 +7,7 @@ export default {
       },
       body: new URLSearchParams({
         c: data,
+        p: 1
       }),
     });
     return req.headers.get('Location');
