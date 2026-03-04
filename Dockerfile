@@ -1,14 +1,13 @@
 # syntax=docker/dockerfile:labs
 
 FROM node:22-alpine AS base
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
   apk update && apk add \
     font-wqy-zenhei pixman cairo pango giflib libjpeg-turbo libpng librsvg vips ffmpeg \
-    gosu@testing rlottie@testing # Currently gosu & rlottie are only packaged in testing repository
+    gosu rlottie
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm add -g pnpm@9.13.2
+RUN npm add -g pnpm@10.30.3
 WORKDIR /app
 
 FROM base AS build
@@ -34,8 +33,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
     pnpm deploy --filter=q2tg-main --prod deploy
 RUN cd ui && pnpm run build
 
-FROM alpine:edge AS tgs-to-gif-build
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+FROM alpine:latest AS tgs-to-gif-build
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
   apk update && apk add \
     python3 build-base cmake rlottie-dev zlib-dev
