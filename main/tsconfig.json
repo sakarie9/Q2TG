@@ -12,7 +12,18 @@
     "jsxFactory": "Html.createElement",
     "jsxFragmentFactory": "Html.Fragment",
     "noEmit": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@icqqjs/icqq": ["./src/types/icqq/index"],
+      "@icqqjs/icqq/lib/common": ["./src/types/icqq/lib/common"],
+      "@icqqjs/icqq/lib/message": ["./src/types/icqq/lib/message/index"],
+      "@icqqjs/icqq/lib/message/elements": ["./src/types/icqq/lib/message/elements"],
+      "@icqqjs/icqq/lib/client": ["./src/types/icqq/lib/client"],
+      "@icqqjs/icqq/lib/core": ["./src/types/icqq/lib/core/index"],
+      "@icqqjs/icqq/lib/internal": ["./src/types/icqq/lib/internal/index"],
+      "@icqqjs/icqq/lib/member": ["./src/types/icqq/lib/member"]
+    }
   },
   "exclude": [
     "node_modules"
