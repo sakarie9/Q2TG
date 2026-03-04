@@ -1,6 +1,6 @@
 import Instance from '../models/Instance';
 import Telegram from '../client/Telegram';
-import { MiraiElem } from '@icqqjs/icqq';
+import type { MiraiElem } from '@icqqjs/icqq';
 import { MessageEvent, QQClient } from '../client/QQClient';
 import { Api } from 'telegram';
 import lottie from '../constants/lottie';

@@ -1,13 +1,5 @@
 import Telegram from '../client/Telegram';
-import {
-  FaceElem,
-  Group as OicqGroup,
-  Friend as OicqFriend,
-  PttElem,
-  Quotable,
-  segment,
-} from '@icqqjs/icqq';
-import { Contactable } from '@icqqjs/icqq/lib/internal';
+import type { FaceElem, PttElem, Quotable } from '@icqqjs/icqq';
 import { fetchFile, getBigFaceUrl, getImageUrlByMd5, isContainsUrl } from '../utils/urls';
 import { ButtonLike, FileLike } from 'telegram/define';
 import { getLogger, Logger } from 'log4js';
@@ -47,7 +39,7 @@ import qfaceChannelMap from '../constants/qfaceChannelMap';
 import { FaceElemEx } from '../client/NapCatClient/convert';
 import nameColor from '../constants/nameColor';
 import memberRoleCache from '../helpers/memberRoleCache';
-import { GroupRole } from '@icqqjs/icqq/lib/common';
+import type { GroupRole } from '@icqqjs/icqq/lib/common';
 import path from 'path';
 import { fileTypeFromBuffer, fileTypeFromFile, FileTypeResult } from 'file-type';
 
@@ -453,10 +445,7 @@ export default class ForwardService {
           }
           case 'record': {
             url = elem.url;
-            if (!url && pair.qq instanceof Contactable && elem.md5 === 'ntptt') {
-              url = await pair.qq.getPttUrl(elem);
-            }
-            else if (!url && this.oicq instanceof OicqClient) {
+            if (!url && this.oicq instanceof OicqClient) {
               const refetchMessage = await this.oicq.oicq.getMsg(event.messageId);
               url = (refetchMessage.message.find(it => it.type === 'record') as PttElem).url;
             }
@@ -620,7 +609,7 @@ export default class ForwardService {
           forceSmallMedia: true,
           optional: true,
         });
-        messageToSend.linkPreview = { showAboveText: true };
+        messageToSend.linkPreview = { showAboveText: true } as any;
       }
       else if (!isContainAtOrChannelFace && isContainsUrl(message)) {
         // 手动找出需要 preview 的 url，防止 preview richHeader 的 url
@@ -632,7 +621,7 @@ export default class ForwardService {
             forceSmallMedia: true,
             optional: true,
           });
-          messageToSend.linkPreview = { showAboveText: false };
+          messageToSend.linkPreview = { showAboveText: false } as any;
         }
       }
 
@@ -811,7 +800,7 @@ export default class ForwardService {
           const temp = await createTempFile();
           tempFiles.push(temp);
           await message.downloadMedia({ outputFile: temp.path });
-          chain.push(segment.video(temp.path));
+          chain.push({ type: 'video' as const, file: temp.path });
         }
         brief += '[视频]';
       }
@@ -834,10 +823,10 @@ export default class ForwardService {
         await message.downloadMedia({ outputFile: temp.path });
         if (this.oicq instanceof OicqClient) {
           const bufSilk = await silk.encode(temp.path);
-          chain.push(segment.record(bufSilk));
+          chain.push({ type: 'record' as const, file: bufSilk });
         }
         else if (this.oicq instanceof NapCatClient) {
-          chain.push(segment.record(temp.path));
+          chain.push({ type: 'record' as const, file: temp.path as string });
         }
         brief += '[语音]';
       }
@@ -858,8 +847,8 @@ export default class ForwardService {
       else if (message.venue && message.venue.geo instanceof Api.GeoPoint) {
         // 地标
         const geo: { lat: number, lng: number } = eviltransform.wgs2gcj(message.venue.geo.lat, message.venue.geo.long);
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
-          chain.push(segment.location(geo.lat, geo.lng, `${message.venue.title} (${message.venue.address})`) as any);
+        if (this.oicq instanceof OicqClient) {
+          chain.push({ type: 'location' as const, lat: geo.lat, lng: geo.lng, address: `${message.venue.title} (${message.venue.address})` } as any);
         }
         else {
           chain.push(`[位置：${message.venue.title} (${message.venue.address})]`);
@@ -869,8 +858,8 @@ export default class ForwardService {
       else if (message.geo instanceof Api.GeoPoint) {
         // 普通的位置，没有名字
         const geo: { lat: number, lng: number } = eviltransform.wgs2gcj(message.geo.lat, message.geo.long);
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
-          chain.push(segment.location(geo.lat, geo.lng, '选中的位置') as any);
+        if (this.oicq instanceof OicqClient) {
+          chain.push({ type: 'location' as const, lat: geo.lat, lng: geo.lng, address: '选中的位置' } as any);
         }
         else {
           chain.push(`[位置：${geo.lat} ${geo.lng}]\nhttps://uri.amap.com/marker?position=${geo.lng},${geo.lat}`);
@@ -1025,7 +1014,7 @@ export default class ForwardService {
           tempFiles.forEach(it => it.cleanup());
           return [{
             ...messageSent,
-            senderId: pair.instanceMapForTg[senderId] instanceof OicqGroup ? pair.instanceMapForTg[senderId].client.uin : 0,//TODO
+            senderId: 0,//TODO (icqq removed: OicqGroup check not applicable)
             brief,
           }];
         }
@@ -1081,7 +1070,7 @@ export default class ForwardService {
       }
       const qqMessages = [] as Array<QQMessageSent>;
       if (chainableElements.length) {
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
+        if (this.oicq instanceof OicqClient) {
           chainableElements.push({
             type: 'mirai',
             data: JSON.stringify({

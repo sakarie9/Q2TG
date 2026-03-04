@@ -1,4 +1,6 @@
-import {
+// All icqq imports are type-only. Runtime icqq usage is via dynamic require()
+// inside methods, so this module can be loaded without @icqqjs/icqq installed.
+import type {
   Client,
   DiscussMessageEvent,
   Forwardable,
@@ -12,18 +14,16 @@ import {
   FriendIncreaseEvent as OicqFriendIncreaseEvent,
   FriendRecallEvent,
   GroupRecallEvent,
-  FriendPokeEvent, GroupPokeEvent, MessageElem, FriendRequestEvent, GroupInviteEvent, type ImageElem, XmlElem, Group, Member,
+  FriendPokeEvent, GroupPokeEvent, MessageElem, FriendRequestEvent, GroupInviteEvent, ImageElem, XmlElem, Group, Member,
 } from '@icqqjs/icqq';
 import random from '../utils/random';
 import fs from 'fs';
 import fsP from 'fs/promises';
-import { Config } from '@icqqjs/icqq/lib/client';
+import type { Config } from '@icqqjs/icqq/lib/client';
 import dataPath from '../helpers/dataPath';
 import os from 'os';
-import { Converter, Image, rand2uuid } from '@icqqjs/icqq/lib/message';
+import type { Converter, Image } from '@icqqjs/icqq/lib/message';
 import { randomBytes } from 'crypto';
-import { escapeXml, gzip, timestamp } from '@icqqjs/icqq/lib/common';
-import { pb } from '@icqqjs/icqq/lib/core';
 import env from '../models/env';
 import {
   CreateQQClientParamsBase, ForwardMessage, Friend, FriendIncreaseEvent, GroupMemberDecreaseEvent,
@@ -59,7 +59,10 @@ export default class OicqClient extends QQClient {
   private constructor(uin: number, id: number, conf?: Config,
                       public readonly signDockerId?: string) {
     super(id);
-    this.oicq = new Client(conf);
+    // Dynamic require: only fails if @icqqjs/icqq is not installed,
+    // which is acceptable since OicqClient is optional.
+    const { Client: IcqqClient } = require('@icqqjs/icqq');
+    this.oicq = new IcqqClient(conf);
     this.log = getLogger(`OicqClient - ${id}`);
   }
 
@@ -173,7 +176,7 @@ export default class OicqClient extends QQClient {
     if (event.message_type === 'discuss') return;
     this.log.debug('OicqClient.onMessage', event);
 
-    let chat: Friend | Group | Member = 'group' in event ? event.group : event.friend;
+    let chat: any = 'group' in event ? event.group : event.friend;
     if (event.message_type === 'private' && event.sender.group_id) {
       chat = this.oicq.pickMember(event.sender.group_id, event.sender.user_id);
     }
@@ -198,27 +201,27 @@ export default class OicqClient extends QQClient {
   };
 
   private onGroupMemberIncrease = async (event: MemberIncreaseEvent) => {
-    const gEvent = new GroupMemberIncreaseEvent(event.group, event.user_id, event.nickname);
+    const gEvent = new GroupMemberIncreaseEvent(event.group as any, event.user_id, event.nickname);
     await this.callHandlers(this.onGroupMemberIncreaseHandlers, gEvent);
   };
 
   private onGroupMemberDecrease = async (event: MemberDecreaseEvent) => {
-    const gEvent = new GroupMemberDecreaseEvent(event.group, event.user_id, event.operator_id, event.dismiss);
+    const gEvent = new GroupMemberDecreaseEvent(event.group as any, event.user_id, event.operator_id, event.dismiss);
     await this.callHandlers(this.onGroupMemberDecreaseHandlers, gEvent);
   };
 
   private onFriendIncrease = async (event: OicqFriendIncreaseEvent) => {
-    const gEvent = new FriendIncreaseEvent(event.friend);
+    const gEvent = new FriendIncreaseEvent(event.friend as any);
     await this.callHandlers(this.onFriendIncreaseHandlers, gEvent);
   };
 
   private onMessageRecall = async (event: FriendRecallEvent | GroupRecallEvent) => {
-    const gEvent = new MessageRecallEvent('friend' in event ? event.friend : event.group, event.seq, event.rand, event.time);
+    const gEvent = new MessageRecallEvent(('friend' in event ? event.friend : event.group) as any, event.seq, event.rand, event.time);
     await this.callHandlers(this.onMessageRecallHandlers, gEvent);
   };
 
   private onPoke = async (event: FriendPokeEvent | GroupPokeEvent) => {
-    const gEvent = new PokeEvent('friend' in event ? event.friend : event.group, event.operator_id, event.target_id, event.action, event.suffix);
+    const gEvent = new PokeEvent(('friend' in event ? event.friend : event.group) as any, event.operator_id, event.target_id, event.action, event.suffix);
     await this.callHandlers(this.onPokeHandlers, gEvent);
   };
 
@@ -238,6 +241,19 @@ export default class OicqClient extends QQClient {
     resid: string,
     tSum: number
   }> {
+    // Dynamic-require icqq utilities — only used in OicqClient path
+    const { Converter, rand2uuid } = require('@icqqjs/icqq/lib/message') as {
+      Converter: new (content: any, opts?: any) => Converter;
+      rand2uuid: (rand: number) => bigint;
+    };
+    const { gzip, timestamp } = require('@icqqjs/icqq/lib/common') as {
+      gzip: (data: Buffer | Uint8Array) => Promise<Buffer>;
+      timestamp: () => number;
+    };
+    const { pb } = require('@icqqjs/icqq/lib/core') as {
+      pb: { encode: (obj: any) => Uint8Array };
+    };
+
     if (!Array.isArray(msglist))
       msglist = [msglist];
     const nodes = [];
@@ -250,7 +266,7 @@ export default class OicqClient extends QQClient {
       const seq = randomBytes(2).readInt16BE();
       const rand = randomBytes(4).readInt32BE();
       let nickname = String(fake.nickname || fake.user_id);
-      if (!nickname && fake instanceof PrivateMessage)
+      if (!nickname)
         nickname = this.oicq.fl.get(fake.user_id)?.nickname || this.oicq.sl.get(fake.user_id)?.nickname || nickname;
       if (cnt < 4) {
         cnt++;
@@ -309,7 +325,7 @@ export default class OicqClient extends QQClient {
   }
 
   async pickGroup(groupId: number) {
-    return this.oicq.pickGroup(groupId);
+    return this.oicq.pickGroup(groupId) as any;
   }
 
   async getFriendsWithCluster() {
@@ -325,10 +341,13 @@ export default class OicqClient extends QQClient {
   }
 
   async getGroupList() {
-    return await Promise.all(Array.from(this.oicq.gl.values()).map(g => this.pickGroup(g.group_id)));
+    return await Promise.all(Array.from(this.oicq.gl.values()).map(g => this.pickGroup(g.group_id))) as any[];
   }
 
   override async createSpoilerImageEndpoint(image: ImageElem, nickname: string, title?: string) {
+    const { escapeXml } = require('@icqqjs/icqq/lib/common') as {
+      escapeXml: (str: string) => string;
+    };
     const msgList: Forwardable[] = [{
       user_id: this.oicq.uin,
       nickname,
@@ -362,6 +381,9 @@ export default class OicqClient extends QQClient {
 
   public async getNTPicRKey() {
     if (!this.rKeyCache) {
+      const { pb } = require('@icqqjs/icqq/lib/core') as {
+        pb: { encode: (obj: any) => Uint8Array };
+      };
       // https://github.com/Icalingua-plus-plus/oicq-icalingua-plus-plus/blob/a8fa0e6e2448a626491cf365e1beb23f2e82a509/lib/message/image.js#L718
       const body = pb.encode({
         1: {

@@ -1,4 +1,3 @@
-import { Group as OicqGroup } from '@icqqjs/icqq';
 import { Friend, Group, GroupMemberInfo } from '../client/QQClient';
 import { NapCatGroup } from '../client/NapCatClient';
 
@@ -12,14 +11,18 @@ export default async function getAboutText(entity: Friend | Group, html: boolean
   else {
     let owner: GroupMemberInfo;
     let memberCount: number;
-    if (entity instanceof OicqGroup) {
-      owner = await entity.pickMember(entity.info.owner_id).renew();
-      memberCount = entity.info.member_count;
-    }
-    else if (entity instanceof NapCatGroup) {
+    if (entity instanceof NapCatGroup) {
       const membersInfo = await entity.getAllMemberInfo();
       owner = membersInfo.find(member => member.role === 'owner');
       memberCount = membersInfo.length;
+    }
+    else {
+      // OicqClient path: access icqq Group directly via 'any'
+      const info = (entity as any).info;
+      if (info) {
+        owner = await entity.pickMember(info.owner_id).renew();
+        memberCount = info.member_count;
+      }
     }
     const self = await entity.pickMember(entity.client.uin).renew();
     text = `<b>群名称：</b>${entity.name}\n` +

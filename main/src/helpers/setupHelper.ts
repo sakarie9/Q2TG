@@ -1,4 +1,4 @@
-import { Platform } from '@icqqjs/icqq';
+import { Platform } from '../types/icqq/lib/core/index';
 
 export default {
   convertTextToPlatform(text: string): Platform {

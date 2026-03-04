@@ -1,6 +1,6 @@
 import Instance from '../models/Instance';
 import Telegram from '../client/Telegram';
-import { AtElem } from '@icqqjs/icqq';
+import type { AtElem } from '@icqqjs/icqq';
 import { Pair } from '../models/Pair';
 import { Api } from 'telegram';
 import db from '../models/db';
@@ -8,8 +8,8 @@ import BigInteger from 'big-integer';
 import helper from '../helpers/forwardHelper';
 import { getLogger, Logger } from 'log4js';
 import flags from '../constants/flags';
-import { MessageEvent, QQClient, Group, GroupMemberInfo, Sendable } from '../client/QQClient';
-import { Member as OicqMember } from '@icqqjs/icqq/lib/member';
+import type { GroupMemberInfo } from '../client/QQClient';
+import { MessageEvent, QQClient, Group, Sendable } from '../client/QQClient';
 import env from '../models/env';
 import forwardHelper from '../helpers/forwardHelper';
 
@@ -95,12 +95,7 @@ export default class {
     else if (event.replyTo) {
       const sourceMember = (pair.qq as Group).pickMember(event.replyTo.fromId);
       let memberInfo: GroupMemberInfo;
-      if (sourceMember instanceof OicqMember) {
-        memberInfo = sourceMember.info;
-      }
-      else {
-        memberInfo = await sourceMember.renew();
-      }
+      memberInfo = await sourceMember.renew();
       to = {
         from: 'qq',
         name: memberInfo.card || memberInfo.nickname,
