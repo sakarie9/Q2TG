@@ -19,10 +19,16 @@ const processNestedForward = async (messages: ForwardMessage[], fromPairId: numb
           });
         }
         elem.data = JSON.stringify({ type: 'forward', uuid: entity.id });
+        continue;
       }
+
       // 处理 forward 类型元素（嵌套合并转发，content 字段中已包含消息内容）
-      else if (elem.type === 'forward' && Array.isArray((elem as any).content)) {
-        await processNestedForward((elem as any).content as ForwardMessage[], fromPairId);
+      const maybeForwardElem = elem as unknown as {
+        type?: string;
+        content?: unknown;
+      };
+      if (maybeForwardElem.type === 'forward' && Array.isArray(maybeForwardElem.content)) {
+        await processNestedForward(maybeForwardElem.content as ForwardMessage[], fromPairId);
       }
     }
   }
