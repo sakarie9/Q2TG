@@ -221,9 +221,9 @@ export default class {
         photo: photo ? { url: photo } : null,
       };
       if (originTgMessage.entities)
-        quoteMessage.entities = await Promise.all(originTgMessage.entities?.map?.(async it => {
+        quoteMessage.entities = originTgMessage.entities?.map?.(it => {
           let type = '';
-          let emoji = '';
+          let custom_emoji_id = '';
           switch (it.className) {
             case 'MessageEntityBold':
               type = 'bold';
@@ -257,17 +257,16 @@ export default class {
               break;
             case 'MessageEntityCustomEmoji':
               type = 'custom_emoji';
-              emoji = await convert.customEmoji(it.documentId.toString(16),
-                () => this.tgBot.getCustomEmoji(it.documentId),
-                false);
+              custom_emoji_id = it.documentId.toString();
               break;
           }
           return {
-            type, emoji,
+            type,
+            ...(custom_emoji_id ? { custom_emoji_id } : {}),
             offset: it.offset,
             length: it.length,
           };
-        }));
+        });
     }
 
     if (originTgMessage.voice) {
