@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   quote-api@0.14.0:
-    hash: ng7kzhfc2oagnurhcxvmp2iuve
+    hash: dcwsk752etptfi2e3vie3wfqkq
     path: patches/quote-api@0.14.0.patch
   telegram@2.26.8:
     hash: 6ezi5zx3h54zaimfvrhyk2gpfa
@@ -38,8 +38,8 @@ importers:
         specifier: 6.1.0
         version: 6.1.0
       quote-api:
-        specifier: https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz
-        version: https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz(patch_hash=ng7kzhfc2oagnurhcxvmp2iuve)(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+        specifier: https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz
+        version: https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz(patch_hash=dcwsk752etptfi2e3vie3wfqkq)(bufferutil@4.0.8)(utf-8-validate@5.0.10)
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -2964,8 +2964,8 @@ packages:
   queue@6.0.2:
     resolution: {integrity: sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==}
 
-  quote-api@https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz:
-    resolution: {tarball: https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz}
+  quote-api@https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz:
+    resolution: {tarball: https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz}
     version: 0.14.0
     engines: {node: '>=22.0.0'}
 
@@ -6442,7 +6442,7 @@ snapshots:
     dependencies:
       inherits: 2.0.4
 
-  quote-api@https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz(patch_hash=ng7kzhfc2oagnurhcxvmp2iuve)(bufferutil@4.0.8)(utf-8-validate@5.0.10):
+  quote-api@https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz(patch_hash=dcwsk752etptfi2e3vie3wfqkq)(bufferutil@4.0.8)(utf-8-validate@5.0.10):
     dependencies:
       canvas: 2.11.2
       dotenv: 7.0.0

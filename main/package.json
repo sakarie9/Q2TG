@@ -57,7 +57,7 @@
     "canvas": "^3.0.1",
     "dockerode": "^4.0.2",
     "prisma": "6.1.0",
-    "quote-api": "https://github.com/LyoSU/quote-api/archive/refs/heads/master.tar.gz",
+    "quote-api": "https://github.com/LyoSU/quote-api/archive/356883cea7b959ce1c0c971a78d8d430a6979633.tar.gz",
     "sharp": "^0.33.5",
     "silk-sdk": "^0.2.2"
   },
