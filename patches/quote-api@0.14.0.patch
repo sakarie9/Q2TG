@@ -22,7 +22,7 @@ diff --git a/utils/quote-generate.js b/utils/quote-generate.js
  const { createCanvas, registerFont } = require('canvas')
  const EmojiDbLib = require('emoji-db')
  const { loadImage } = require('canvas')
-@@ -14,10 +15,10 @@
+@@ -14,10 +15,11 @@
  
  function loadFont () {
    console.log('font load start')
@@ -32,6 +32,7 @@ diff --git a/utils/quote-generate.js b/utils/quote-generate.js
    fs.readdir(fontsDir, (_err, files) => {
 -    files.forEach((file) => {
 +    if (files) files.forEach((file) => {
++      if (!/\.(ttf|otf|woff2?)$/i.test(file)) return
        try {
          registerFont(`${fontsDir}${file}`, { family: file.replace(/\.[^/.]+$/, '') })
        } catch (error) {
