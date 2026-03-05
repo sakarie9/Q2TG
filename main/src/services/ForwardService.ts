@@ -646,6 +646,31 @@ export default class ForwardService {
 
       let tgMessage: Api.Message;
       try {
+        if (Array.isArray(messageToSend.file) && messageToSend.file.length > 10) {
+          const sentMessages: Api.Message[] = [];
+          const chunks = _.chunk(messageToSend.file, 10);
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const params = {
+              ...messageToSend,
+              file: chunk.length === 1 ? chunk[0] : chunk,
+            } as SendMessageParams;
+            if (i > 0) {
+              delete params.message;
+              delete params.buttons;
+              delete params.replyTo;
+            }
+            const sent = await pair.tg.sendMessage(params);
+            if (Array.isArray(sent)) {
+              sentMessages.push(...sent);
+            }
+            else {
+              sentMessages.push(sent);
+            }
+          }
+          tgMessage = sentMessages[0];
+          return { tgMessage: sentMessages, richHeaderUsed };
+        }
         tgMessage = await pair.tg.sendMessage(messageToSend);
       }
       catch (e) {
