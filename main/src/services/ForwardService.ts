@@ -1152,6 +1152,7 @@ export default class ForwardService {
       const chain: (string | SendableElem)[] = [];
       let brief = '';
       let caption = '';
+      let captionMessage: Api.Message;
 
       for (const mediaMessage of sortedMessages) {
         if (mediaMessage.photo instanceof Api.Photo || IMAGE_MIMES.includes(mediaMessage.document?.mimeType)) {
@@ -1164,6 +1165,7 @@ export default class ForwardService {
           brief += '[图片]';
           if (!caption && mediaMessage.message) {
             caption = mediaMessage.message;
+            captionMessage = mediaMessage;
           }
         }
         else {
@@ -1174,6 +1176,13 @@ export default class ForwardService {
           }
           return qqMessages;
         }
+      }
+
+      if (captionMessage?.forward?.senderId?.eq?.(this.tgBot.me.id) && /^.*: ?$/.test(caption.split('\n')[0])) {
+        const firstLine = caption.split('\n')[0];
+        caption = caption.includes('\n') ? caption.substring(caption.indexOf('\n') + 1) : '';
+        messageHeader = helper.getUserDisplayName(firstMessage.sender) + ' 转发自 ' +
+          firstLine.substring(0, firstLine.indexOf(':')) + ': \n';
       }
 
       if (this.instance.workMode === 'group') {
