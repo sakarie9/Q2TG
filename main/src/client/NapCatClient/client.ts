@@ -27,17 +27,44 @@ export class NapCatClient extends QQClient {
 
   public static async create(params: CreateNapCatParams) {
     const instance = new this(params.id, params.wsUrl);
-    return new Promise<NapCatClient>((resolve, reject) => {
-      instance.ws.onopen = async () => {
+    return new Promise<NapCatClient>((resolve) => {
+      let resolved = false;
+      let refreshing = false;
+
+      const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+      const refreshSelfUntilReady = async () => {
+        if (resolved || refreshing) {
+          return;
+        }
+        refreshing = true;
+        try {
+          while (!resolved && instance.ws.readyState === 1) {
+            try {
+              await instance.refreshSelf();
+              resolved = true;
+              resolve(instance);
+              return;
+            }
+            catch (e) {
+              instance.logger.warn('WS 已连接但尚未就绪，1 秒后重试获取登录信息', e);
+              posthog.capture('WS 已连接但尚未就绪', { error: e });
+              await wait(1000);
+            }
+          }
+        }
+        finally {
+          refreshing = false;
+        }
+      };
+
+      instance.ws.onopen = () => {
         instance.logger.info('WS 连接成功');
-        instance.ws.onerror = null;
-        await instance.refreshSelf();
-        resolve(instance);
+        void refreshSelfUntilReady();
       };
       instance.ws.onerror = (e) => {
         instance.logger.error('WS 连接出错', e);
         posthog.capture('WS 连接出错', { error: e });
-        reject(e);
       };
     });
   }
