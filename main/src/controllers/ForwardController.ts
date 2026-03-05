@@ -21,11 +21,17 @@ import {
 import posthog from '../models/posthog';
 import env from '../models/env';
 import memberRoleCache from '../helpers/memberRoleCache';
+import { Pair } from '../models/Pair';
 
 export default class ForwardController {
   private readonly forwardService: ForwardService;
   private readonly log: Logger;
   private tgUser: Telegram | undefined;
+  private readonly tgMediaGroupBuffer = new Map<string, {
+    pair: Pair;
+    messages: Api.Message[];
+    timer: NodeJS.Timeout;
+  }>();
 
   constructor(
     private readonly instance: Instance,
@@ -74,9 +80,7 @@ export default class ForwardController {
       let { tgMessage, richHeaderUsed } = await this.forwardService.forwardFromQq(event, pair);
       if (!tgMessage) return;
       // 更新数据库
-      // 库的类型有问题
-      let tgMessages = tgMessage as undefined as Api.Message[];
-      if (!Array.isArray(tgMessages)) tgMessages = [tgMessage];
+      const tgMessages = Array.isArray(tgMessage) ? tgMessage : [tgMessage];
       for (const tgMessage of tgMessages) {
         await db.message.create({
           data: {
@@ -119,6 +123,25 @@ export default class ForwardController {
       if (message.senderId?.eq(this.instance.botMe.id)) return true;
       if (!pair) return false;
       if ((pair.flags | this.instance.flags) & flags.DISABLE_TG2Q) return;
+
+      if (message.groupedId) {
+        const key = `${pair.dbId}:${message.groupedId.toString()}`;
+        const existed = this.tgMediaGroupBuffer.get(key);
+        if (existed) {
+          existed.messages.push(message);
+          clearTimeout(existed.timer);
+          existed.timer = setTimeout(() => this.flushTelegramMediaGroup(key), 800);
+        }
+        else {
+          this.tgMediaGroupBuffer.set(key, {
+            pair,
+            messages: [message],
+            timer: setTimeout(() => this.flushTelegramMediaGroup(key), 800),
+          });
+        }
+        return true;
+      }
+
       this.log.debug('收到 TG 消息', message);
       const qqMessagesSent = await this.forwardService.forwardFromTelegram(message, pair);
       if (qqMessagesSent) {
@@ -148,6 +171,51 @@ export default class ForwardController {
     catch (e) {
       this.log.error('处理 Telegram 消息时遇到问题', e);
       posthog.capture('处理 Telegram 消息时遇到问题', { error: e });
+    }
+  };
+
+  private flushTelegramMediaGroup = async (key: string) => {
+    const entry = this.tgMediaGroupBuffer.get(key);
+    if (!entry) return;
+    this.tgMediaGroupBuffer.delete(key);
+
+    try {
+      const sortedMessages = [...entry.messages].sort((a, b) => a.id - b.id);
+      if (!sortedMessages.length) return;
+
+      this.log.debug('处理 TG 媒体组', {
+        key,
+        messageCount: sortedMessages.length,
+      });
+
+      const qqMessagesSent = await this.forwardService.forwardFromTelegramMediaGroup(sortedMessages, entry.pair);
+      if (!qqMessagesSent?.length) return;
+
+      const persistedQqMessage = qqMessagesSent[0];
+      for (const tgMessage of sortedMessages) {
+        await db.message.create({
+          data: {
+            qqRoomId: entry.pair.qqRoomId,
+            qqSenderId: persistedQqMessage.senderId,
+            time: persistedQqMessage.time,
+            brief: persistedQqMessage.brief,
+            seq: persistedQqMessage.seq,
+            rand: persistedQqMessage.rand,
+            pktnum: 1,
+            tgChatId: entry.pair.tgId,
+            tgMsgId: tgMessage.id,
+            instanceId: this.instance.id,
+            tgMessageText: tgMessage.message,
+            tgFileId: forwardHelper.getMessageDocumentId(tgMessage),
+            nick: helper.getUserDisplayName(tgMessage.sender),
+            tgSenderId: BigInt(Number(tgMessage.senderId || tgMessage.sender?.id) || helper.peerToId(tgMessage.peerId)),
+          },
+        });
+      }
+    }
+    catch (e) {
+      this.log.error('处理 TG 媒体组时遇到问题', e);
+      posthog.capture('处理 TG 媒体组时遇到问题', { error: e });
     }
   };
 
