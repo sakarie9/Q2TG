@@ -163,6 +163,29 @@ export default {
         posthog.capture('解析定位时出错', { error: err });
       }
     }
+    else if (jsonObj.app === 'com.tencent.tuwen.lua') {
+      try {
+        const news = jsonObj.meta?.news;
+        const title = news?.title || news?.desc || jsonObj.prompt?.replace(/^\[分享\]/, '')?.trim();
+        const jumpUrl = news?.jumpUrl || jsonObj.meta?.detail?.jumpUrl;
+        if (jumpUrl) {
+          return {
+            type: 'text',
+            text: title ? `${title}\n${jumpUrl}` : jumpUrl,
+          };
+        }
+        if (title) {
+          return {
+            type: 'text',
+            text: title,
+          };
+        }
+      }
+      catch (err) {
+        log.error('解析图文分享时出错', err);
+        posthog.capture('解析图文分享时出错', { error: err });
+      }
+    }
     let appurl: string;
     const biliRegex = /(https?:\\?\/\\?\/b23\.tv\\?\/\w*)\??/;
     const zhihuRegex = /(https?:\\?\/\\?\/\w*\.?zhihu\.com\\?\/[^?"=]*)\??/;
