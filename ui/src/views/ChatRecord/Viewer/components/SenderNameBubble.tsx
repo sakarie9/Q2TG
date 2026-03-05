@@ -6,6 +6,7 @@ export default defineComponent({
   props: {
     name: { required: true, type: String },
     id: { required: true, type: [String, Number] },
+    sticky: { type: Boolean, default: true },
   },
   setup(props) {
     const color = computed(() => {
@@ -20,7 +21,10 @@ export default defineComponent({
         '#FF719A'][id % 7];
     });
 
-    return () => <div style={{ color: color.value }} class={`${styles.container} ${styles.senderName}`}>
+    return () => <div
+      style={{ color: color.value }}
+      class={`${styles.container} ${styles.senderName} ${props.sticky ? '' : styles.senderNameNoSticky}`}
+    >
       {props.name}
     </div>;
   },

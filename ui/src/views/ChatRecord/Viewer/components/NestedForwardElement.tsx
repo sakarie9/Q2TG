@@ -41,7 +41,7 @@ export default defineComponent({
             padding: '4px',
             borderTop: '1px solid rgba(128,128,128,0.2)',
           }}>
-            {groupedHistory.value.map(e => <DateContainer group={e} key={e.date}/>)}
+            {groupedHistory.value.map(e => <DateContainer group={e} sticky={false} key={e.date}/>)}
           </div>
         )}
       </div>
