@@ -99,6 +99,8 @@ export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{
 export type NapCatForwardElem = {
   type: 'forward',
   id: string,
+  resid?: string,
+  fileName?: string,
   content: ForwardMessage[],
 }
 
@@ -164,6 +166,8 @@ export const napCatReceiveToMessageElem = (data: Receive[keyof Receive]): Messag
       return {
         type: 'forward',
         id: data.data.id as any,
+        resid: ((data.data as any).resid || (data.data as any).res_id) as any,
+        fileName: ((data.data as any).fileName || (data.data as any).uniseq) as any,
         content: 'content' in data.data ? napCatForwardMultiple(data.data.content as any) : undefined,
       };
     case 'reply':

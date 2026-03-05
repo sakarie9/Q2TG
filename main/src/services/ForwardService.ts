@@ -533,9 +533,20 @@ export default class ForwardService {
           case 'poke':
             message = `[<i>戳一戳</i>] ${helper.htmlEscape(elem.text)}`;
             break;
-          case 'forward':
-            await useForward(elem.id, '', elem.content);
+          case 'forward': {
+            const forwardElem = elem as unknown as {
+              id: string;
+              resid?: string;
+              res_id?: string;
+              fileName?: string;
+              uniseq?: string;
+              content?: ForwardMessage[];
+            };
+            const resId = forwardElem.resid || forwardElem.res_id || forwardElem.id;
+            const fileName = forwardElem.fileName || forwardElem.uniseq || '';
+            await useForward(resId, fileName, forwardElem.content);
             break;
+          }
         }
       }
       this.crhPlayerInfo.delete(pair);
