@@ -9,6 +9,7 @@ import noAvatar from '../assets/no-avatar.webp';
 export default defineComponent({
   props: {
     group: { required: true, type: Object as PropType<SenderGroup> },
+    sticky: { type: Boolean, default: true },
   },
   setup(props) {
     return () => <div class={styles.container}>
@@ -23,7 +24,7 @@ export default defineComponent({
         />
       </div>
       <div class={styles.mainContainer}>
-        <SenderNameBubble name={props.group.username} id={props.group.senderId}/>
+        <SenderNameBubble name={props.group.username} id={props.group.senderId} sticky={props.sticky}/>
         {props.group.messages.map((e, index) =>
           <MessageBubble message={e} key={index}/>)}
       </div>

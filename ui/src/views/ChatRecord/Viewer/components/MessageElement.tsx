@@ -1,10 +1,11 @@
 import { defineComponent, type PropType } from 'vue';
-import type { MessageElemExt } from '../types/MessageElemExt';
+import type { ForwardElemExt, MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
 import { NImage } from 'naive-ui';
 import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
+import NestedForwardElement from './NestedForwardElement';
 import linkifyStr from 'linkify-string';
 
 export default defineComponent({
@@ -69,6 +70,13 @@ export default defineComponent({
           return <JsonElement json={props.elem.data}/>;
         case 'xml':
           return <XmlElement xml={props.elem.data}/>;
+        case 'forward': {
+          const content = (props.elem as ForwardElemExt).content;
+          if (Array.isArray(content) && content.length > 0) {
+            return <NestedForwardElement content={content}/>;
+          }
+          return <div>[嵌套合并转发消息]</div>;
+        }
         default:
           return <></>;
       }
