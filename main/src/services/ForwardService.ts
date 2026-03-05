@@ -646,6 +646,31 @@ export default class ForwardService {
 
       let tgMessage: Api.Message;
       try {
+        if (Array.isArray(messageToSend.file) && messageToSend.file.length > 10) {
+          const sentMessages: Api.Message[] = [];
+          const chunks = _.chunk(messageToSend.file, 10);
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const params = {
+              ...messageToSend,
+              file: chunk.length === 1 ? chunk[0] : chunk,
+            } as SendMessageParams;
+            if (i > 0) {
+              delete params.message;
+              delete params.buttons;
+              delete params.replyTo;
+            }
+            const sent = await pair.tg.sendMessage(params);
+            if (Array.isArray(sent)) {
+              sentMessages.push(...sent);
+            }
+            else {
+              sentMessages.push(sent);
+            }
+          }
+          tgMessage = sentMessages[0];
+          return { tgMessage: sentMessages, richHeaderUsed };
+        }
         tgMessage = await pair.tg.sendMessage(messageToSend);
       }
       catch (e) {
@@ -1122,6 +1147,148 @@ export default class ForwardService {
       }
       catch {
       }
+    }
+  }
+
+  public async forwardFromTelegramMediaGroup(messages: Api.Message[], pair: Pair): Promise<Array<QQMessageSent>> {
+    try {
+      if (!messages.length) return [];
+      const sortedMessages = [...messages].sort((a, b) => a.id - b.id);
+      const firstMessage = sortedMessages[0];
+
+      const senderId = Number(firstMessage.senderId || firstMessage.sender?.id) || pair.tgId;
+      let userDisplayName = helper.getUserDisplayName(firstMessage.sender);
+      if (senderId === pair.tgId && !firstMessage.sender) {
+        userDisplayName = helper.getUserDisplayName(firstMessage.chat);
+      }
+      let messageHeader = (userDisplayName.length > 25 ? userDisplayName.substring(0, 25) + '…' : userDisplayName) +
+        (firstMessage.forward ? ' 转发自 ' +
+          (firstMessage.fwdFrom?.fromName ||
+            helper.getUserDisplayName(await firstMessage.forward.getChat() || await firstMessage.forward.getSender())) :
+          '');
+      messageHeader += ': \n';
+      if ((pair.flags | this.instance.flags) & flags.COLOR_EMOJI_PREFIX) {
+        let emoji1 = emoji.tgColor((firstMessage.sender as Api.User)?.color?.color || senderId);
+        if (firstMessage.sender instanceof Api.Channel && firstMessage.sender.broadcast) {
+          emoji1 = '📢' + emoji1;
+        }
+        else if (firstMessage.sender instanceof Api.Chat || firstMessage.sender instanceof Api.Channel || !firstMessage.senderId) {
+          emoji1 = '👻' + emoji1;
+        }
+        messageHeader = emoji1 + messageHeader;
+      }
+
+      const chain: (string | SendableElem)[] = [];
+      let brief = '';
+      let caption = '';
+      let captionMessage: Api.Message;
+
+      for (const mediaMessage of sortedMessages) {
+        if (mediaMessage.photo instanceof Api.Photo || IMAGE_MIMES.includes(mediaMessage.document?.mimeType)) {
+          chain.push({
+            type: 'image',
+            file: await mediaMessage.downloadMedia({}) as Buffer,
+            asface: !!mediaMessage.sticker,
+            brief: mediaMessage.sticker ? helper.getStickerBrief(mediaMessage.sticker) : undefined,
+          });
+          brief += '[图片]';
+          if (!caption && mediaMessage.message) {
+            caption = mediaMessage.message;
+            captionMessage = mediaMessage;
+          }
+        }
+        else {
+          // 非图片媒体组元素使用原有逻辑兜底，避免行为异常
+          const qqMessages = [] as Array<QQMessageSent>;
+          for (const singleMessage of sortedMessages) {
+            qqMessages.push(...await this.forwardFromTelegram(singleMessage, pair));
+          }
+          return qqMessages;
+        }
+      }
+
+      if (captionMessage?.forward?.senderId?.eq?.(this.tgBot.me.id) && /^.*: ?$/.test(caption.split('\n')[0])) {
+        const firstLine = caption.split('\n')[0];
+        caption = caption.includes('\n') ? caption.substring(caption.indexOf('\n') + 1) : '';
+        messageHeader = helper.getUserDisplayName(firstMessage.sender) + ' 转发自 ' +
+          firstLine.substring(0, firstLine.indexOf(':')) + ': \n';
+      }
+
+      if (this.instance.workMode === 'group') {
+        chain.unshift(messageHeader);
+      }
+      if (caption) {
+        chain.push(caption);
+        brief += caption;
+      }
+
+      let source: Quotable;
+      if (firstMessage.replyToMsgId || firstMessage.replyTo) {
+        try {
+          const quote = firstMessage.replyToMsgId && await db.message.findFirst({
+            where: {
+              tgChatId: Number(pair.tg.id),
+              tgMsgId: firstMessage.replyToMsgId,
+              instanceId: this.instance.id,
+            },
+          });
+          if (quote) {
+            source = {
+              message: firstMessage.replyTo?.quoteText || quote.brief || ' ',
+              seq: quote.seq,
+              rand: Number(quote.rand),
+              user_id: Number(quote.qqSenderId),
+              time: quote.time,
+            };
+          }
+          else {
+            source = {
+              message: firstMessage.replyTo?.quoteText || '回复消息找不到',
+              seq: 1,
+              time: Math.floor(new Date().getTime() / 1000),
+              rand: 1,
+              user_id: this.oicq.uin,
+            };
+          }
+        }
+        catch (e) {
+          this.log.error('查找回复消息失败', e);
+          posthog.capture('查找回复消息失败', { error: e });
+          source = {
+            message: '查找回复消息失败',
+            seq: 1,
+            time: Math.floor(new Date().getTime() / 1000),
+            rand: 1,
+            user_id: this.oicq.uin,
+          };
+        }
+      }
+
+      if (this.oicq instanceof OicqClient) {
+        chain.push({
+          type: 'mirai',
+          data: JSON.stringify({
+            id: senderId,
+            eqq: { type: 'tg', tgUid: senderId, noSplitSender: this.instance.workMode === 'personal', version: 2 },
+          }, undefined, 0),
+        } as any);
+      }
+
+      const sent = await pair.qq.sendMsg(chain, source);
+      return [{
+        ...sent,
+        brief,
+        senderId: this.oicq.uin,
+      }];
+    }
+    catch (e) {
+      this.log.error('从 TG 媒体组到 QQ 的消息转发失败，回退到逐条转发', e);
+      posthog.capture('从 TG 媒体组到 QQ 的消息转发失败', { error: e });
+      const qqMessages = [] as Array<QQMessageSent>;
+      for (const singleMessage of messages) {
+        qqMessages.push(...await this.forwardFromTelegram(singleMessage, pair));
+      }
+      return qqMessages;
     }
   }
 }
