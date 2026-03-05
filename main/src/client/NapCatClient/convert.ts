@@ -8,12 +8,17 @@ import fs from 'fs';
 import { Readable } from 'node:stream';
 import type { FaceElem } from '@icqqjs/icqq/lib/message/elements';
 
+type NapCatForwardSendableElem = {
+  type: 'forward',
+  id: string,
+};
+
 const createTempFile = (options: Parameters<typeof createTempFileBase>[0] = {}) => createTempFileBase({
   tmpdir: env.CACHE_DIR,
   ...options,
 });
 
-export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{ elem: Send[keyof Send], tempFiles: FileResult[] }> => {
+export const messageElemToNapCatSendable = async (elem: SendableElem | NapCatForwardSendableElem): Promise<{ elem: Send[keyof Send], tempFiles: FileResult[] }> => {
   const noTmp = (elem: Send[keyof Send]) => ({
     elem,
     tempFiles: [],
@@ -34,6 +39,13 @@ export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{
           result: elem.id,
         },
       });
+    case 'forward':
+      return noTmp({
+        type: 'forward',
+        data: {
+          id: (elem as any).id,
+        },
+      } as any);
     case 'image':
     case 'record':
     case 'video':

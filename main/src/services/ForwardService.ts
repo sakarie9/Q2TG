@@ -133,6 +133,101 @@ export default class ForwardService {
 
   private crhPlayerInfo = new Map<Pair, CrhPlayerInfo>();
 
+  private parseForwardMultipleUuidFromUrl(url?: string): string | null {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      const startParam = parsed.searchParams.get('tgWebAppStartParam') || parsed.searchParams.get('startapp');
+      if (!startParam) return null;
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(startParam) ?
+        startParam.toLowerCase() :
+        null;
+    }
+    catch {
+      return null;
+    }
+  }
+
+  private extractForwardMultipleUuids(message: Api.Message): string[] {
+    const set = new Set<string>();
+    const collectFromUrl = (url?: string) => {
+      const uuid = this.parseForwardMultipleUuidFromUrl(url);
+      if (uuid) set.add(uuid);
+    };
+    const collectFromText = (text?: string) => {
+      if (!text) return;
+      const urls = text.match(regExps.url) || [];
+      for (const url of urls) {
+        collectFromUrl(url);
+      }
+    };
+
+    collectFromText(message.message);
+
+    const entities = message.entities || [];
+    for (const entity of entities) {
+      if (entity instanceof Api.MessageEntityTextUrl) {
+        collectFromUrl(entity.url);
+      }
+      else if (entity instanceof Api.MessageEntityUrl) {
+        const start = entity.offset;
+        const end = entity.offset + entity.length;
+        collectFromUrl(message.message?.substring(start, end));
+      }
+    }
+
+    const rows = ((message.replyMarkup as any)?.rows || []) as any[];
+    for (const row of rows) {
+      for (const button of (row?.buttons || [])) {
+        collectFromUrl(button?.url);
+      }
+    }
+
+    return [...set];
+  }
+
+  private async sendForwardMultipleBackToQq(pair: Pair, uuid: string, source?: Quotable, brief?: string) {
+    const forwardMultiple = await db.forwardMultiple.findFirst({
+      where: {
+        id: uuid,
+        fromPairId: pair.dbId,
+      },
+    });
+    if (!forwardMultiple) return null;
+
+    if (this.oicq instanceof NapCatClient) {
+      const messageSent = await pair.qq.sendMsg({
+        type: 'forward',
+        id: forwardMultiple.resId,
+      } as any, source);
+      return {
+        ...messageSent,
+        brief: brief || '[转发多条消息]',
+        senderId: this.oicq.uin,
+      };
+    }
+
+    const messages = await pair.qq.getForwardMsg(forwardMultiple.resId, forwardMultiple.fileName || undefined);
+    if (this.oicq instanceof OicqClient) {
+      await this.oicq.refreshImageRKey(messages);
+    }
+
+    const nodes = messages.map(it => ({
+      type: 'node' as const,
+      user_id: it.user_id,
+      nickname: it.nickname,
+      time: it.time,
+      message: it.message,
+    }));
+
+    const messageSent = await pair.qq.sendMsg(nodes, source);
+    return {
+      ...messageSent,
+      brief: brief || '[转发多条消息]',
+      senderId: this.oicq.uin,
+    };
+  }
+
   public async forwardFromQq(event: MessageEvent, pair: Pair) {
     const tempFiles: FileResult[] = [], messageToSend: SendMessageParams = {};
     try {
@@ -182,12 +277,22 @@ export default class ForwardService {
           message = helper.generateForwardBrief(messages);
 
         if (env.WEB_ENDPOINT) {
-          const dbEntry = await db.forwardMultiple.create({
-            data: { resId, fileName, fromPairId: pair.dbId },
-          });
-          const hash = dbEntry.id;
-          const viewerUrl = env.CRV_VIEWER_APP ? `${env.CRV_VIEWER_APP}?startapp=${hash}` : `${env.WEB_ENDPOINT}/ui/chatRecord?tgWebAppStartParam=${hash}`;
-          buttons.push(Button.url('📃查看', viewerUrl));
+          try {
+            const dbEntry = await db.forwardMultiple.create({
+              data: {
+                resId,
+                fileName: fileName || '',
+                fromPairId: pair.dbId,
+              },
+            });
+            const hash = dbEntry.id;
+            const viewerUrl = env.CRV_VIEWER_APP ? `${env.CRV_VIEWER_APP}?startapp=${hash}` : `${env.WEB_ENDPOINT}/ui/chatRecord?tgWebAppStartParam=${hash}`;
+            buttons.push(Button.url('📃查看', viewerUrl));
+          }
+          catch (e) {
+            this.log.error('记录合并消息映射失败', e);
+            posthog.capture('记录合并消息映射失败', { error: e });
+          }
         }
         else if (env.CRV_API) {
           if (!message) return;
@@ -980,6 +1085,24 @@ export default class ForwardService {
             rand: 1,
             user_id: this.oicq.uin,
           };
+        }
+      }
+
+      const forwardedMultipleUuids = message.forward?.senderId?.eq?.(this.tgBot.me.id) ? this.extractForwardMultipleUuids(message) : [];
+
+      if (forwardedMultipleUuids.length) {
+        for (const uuid of forwardedMultipleUuids) {
+          try {
+            const sent = await this.sendForwardMultipleBackToQq(pair, uuid, source, brief);
+            if (sent) {
+              tempFiles.forEach(it => it.cleanup());
+              return [sent];
+            }
+          }
+          catch (e) {
+            this.log.error('转发 QQ 合并消息回传失败', e);
+            posthog.capture('转发 QQ 合并消息回传失败', { error: e });
+          }
         }
       }
 
