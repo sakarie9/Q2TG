@@ -71,6 +71,13 @@ export abstract class NapCatEntity implements QQEntity {
       }
       return it;
     });
+    // 统一出口过滤空文本，避免发送 text: "" 触发 QQ 客户端“该消息类型暂不支持查看”
+    content = content.filter(it => {
+      if (typeof it === 'string') {
+        return it !== '';
+      }
+      return !(it.type === 'text' && it.text === '');
+    });
 
     const tmpFiles: FileResult[] = [];
     const message = await Promise.all(content.map(async it => {
