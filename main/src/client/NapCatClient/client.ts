@@ -253,7 +253,7 @@ export class NapCatClient extends QQClient {
       name: it.categoryName || (it as any).categroyName, // typo in API
       friends: it.buddyList.map(friend => NapCatFriend.createExisted(this, {
         nickname: friend.nick || friend.nickname,
-        uid: parseInt(friend.uin || friend.user_id),
+        uid: parseInt(friend.uin) || friend.user_id,
         remark: friend.remark,
       })),
     }));
