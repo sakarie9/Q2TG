@@ -58,17 +58,19 @@ export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{
       if (!/^(https?|file):\/\//.test(elem.file) && elem.file.startsWith('/')) {
         elem.file = `file://${elem.file}`;
       }
-      elem.file = elem.file.replace('D:\\Projects\\Q2TG\\next\\main\\data\\cache\\', '/app/.config/QQ/NapCat/temp/');
+      const mediaData: any = {
+        ...elem,
+        file: elem.file,
+        name: elem.type,
+      };
+      if (elem.type === 'image') {
+        mediaData.summary = ('brief' in elem && elem.brief) || env.IMAGE_SUMMARY || '[图片]';
+        mediaData.sub_type = ('asface' in elem && elem.asface) ? 7 : 0;
+      }
       return {
         elem: {
           type: elem.type,
-          data: {
-            ...elem,
-            file: elem.file,
-            summary: ('brief' in elem && elem.brief) || env.IMAGE_SUMMARY || (`[Q2TG ${elem.type}]`),
-            name: elem.type,
-            sub_type: ('asface' in elem && elem.asface) ? 7 : 0,
-          },
+          data: mediaData,
         } as any,
         tempFiles,
       };
