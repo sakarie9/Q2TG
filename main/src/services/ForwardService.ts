@@ -1105,7 +1105,13 @@ export default class ForwardService {
         }
       }
       const qqMessages = [] as Array<QQMessageSent>;
-      if (chainableElements.length) {
+      const hasChainablePayload = chainableElements.some(element => {
+        if (typeof element === 'string') {
+          return element !== '';
+        }
+        return !(element.type === 'text' && 'text' in element && element.text === '');
+      });
+      if (chainableElements.length && hasChainablePayload) {
         if (this.oicq instanceof OicqClient) {
           chainableElements.push({
             type: 'mirai',
@@ -1120,6 +1126,12 @@ export default class ForwardService {
           ...await pair.qq.sendMsg(messageToSend, source),
           brief,
           senderId: this.oicq.uin,
+        });
+      }
+      else if (chainableElements.length) {
+        this.log.debug('跳过空的 TG->QQ chainable 消息段', {
+          senderId,
+          tgMsgId: message.id,
         });
       }
       if (notChainableElements.length) {
