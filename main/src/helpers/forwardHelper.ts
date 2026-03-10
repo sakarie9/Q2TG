@@ -166,7 +166,7 @@ export default {
     else if (jsonObj.app === 'com.tencent.tuwen.lua') {
       try {
         const news = jsonObj.meta?.news;
-        const title = news?.title || news?.desc || jsonObj.prompt?.trim();
+        const title = jsonObj.prompt?.trim() || news?.title || news?.desc;
         const jumpUrl = news?.jumpUrl || jsonObj.meta?.detail?.jumpUrl;
         if (jumpUrl) {
           return {
@@ -189,7 +189,7 @@ export default {
     else if (jsonObj.app === 'com.tencent.miniapp_01') {
       try {
         const detail = jsonObj.meta?.detail_1 || jsonObj.meta?.detail;
-        const title = detail?.title || detail?.desc || jsonObj.prompt?.trim();
+        const title = jsonObj.prompt?.trim() || detail?.title || detail?.desc;
         let jumpUrl = detail?.qqdocurl || detail?.url;
         if (jumpUrl && !/^https?:\/\//.test(jumpUrl)) {
           jumpUrl = 'https://' + jumpUrl;
