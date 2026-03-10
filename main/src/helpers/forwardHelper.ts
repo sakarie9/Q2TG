@@ -166,7 +166,7 @@ export default {
     else if (jsonObj.app === 'com.tencent.tuwen.lua') {
       try {
         const news = jsonObj.meta?.news;
-        const title = news?.title || news?.desc || jsonObj.prompt?.replace(/^\[分享\]/, '')?.trim();
+        const title = news?.title || news?.desc || jsonObj.prompt?.trim();
         const jumpUrl = news?.jumpUrl || jsonObj.meta?.detail?.jumpUrl;
         if (jumpUrl) {
           return {
@@ -184,6 +184,32 @@ export default {
       catch (err) {
         log.error('解析图文分享时出错', err);
         posthog.capture('解析图文分享时出错', { error: err });
+      }
+    }
+    else if (jsonObj.app === 'com.tencent.miniapp_01') {
+      try {
+        const detail = jsonObj.meta?.detail_1 || jsonObj.meta?.detail;
+        const title = detail?.title || detail?.desc || jsonObj.prompt?.trim();
+        let jumpUrl = detail?.qqdocurl || detail?.url;
+        if (jumpUrl && !/^https?:\/\//.test(jumpUrl)) {
+          jumpUrl = 'https://' + jumpUrl;
+        }
+        if (jumpUrl) {
+          return {
+            type: 'text',
+            text: title ? `${title}\n${jumpUrl}` : jumpUrl,
+          };
+        }
+        if (title) {
+          return {
+            type: 'text',
+            text: title,
+          };
+        }
+      }
+      catch (err) {
+        log.error('解析小程序分享时出错', err);
+        posthog.capture('解析小程序分享时出错', { error: err });
       }
     }
     let appurl: string;
