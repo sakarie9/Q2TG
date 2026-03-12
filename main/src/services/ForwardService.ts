@@ -141,7 +141,8 @@ export default class ForwardService {
         buttons: ButtonLike[] = [],
         replyTo = 0,
         forceDocument = false,
-        isContainAtOrChannelFace = false;
+        isContainAtOrChannelFace = false,
+        hasQqAsface = false;
       let messageHeader = '', messageHeaderWithLink = '', sender = '';
       if (!event.dm) {
         // 产生头部，这和工作模式没有关系
@@ -362,13 +363,29 @@ export default class ForwardService {
                 // 防止在 TG 中一起发送多个 sticker 失败
                 && event.message.filter(it => it.type === 'image').length === 1
               ) {
+                hasQqAsface = true;
                 const res = await convert.webpOrWebm(elem.file as string, () => fetchFile(elem.url));
                 const stat = await fsP.stat(res);
+                this.log.debug('QQ asface 转贴纸转换结果', {
+                  qqMessageId: event.messageId,
+                  qqRoomId: pair.qqRoomId,
+                  sourceFile: elem.file,
+                  sourceUrl: elem.url,
+                  convertedPath: res,
+                  convertedSize: stat.size,
+                });
                 const upload = await pair.tg.parent.uploadFile({
                   file: new CustomFile(path.basename(res), stat.size, res),
                   workers: 2,
                 });
                 const fileType = await fileTypeFromFile(res);
+                this.log.debug('QQ asface 转贴纸文件类型', {
+                  qqMessageId: event.messageId,
+                  qqRoomId: pair.qqRoomId,
+                  sourceFile: elem.file,
+                  mime: fileType?.mime,
+                  ext: fileType?.ext,
+                });
                 useSticker(new Api.InputMediaUploadedDocument({
                   file: upload,
                   mimeType: fileType.mime,
@@ -391,6 +408,14 @@ export default class ForwardService {
             catch (e) {
               this.log.error('下载媒体失败', e);
               posthog.capture('下载媒体失败', { error: e });
+              if (elem.type === 'image' && (elem.asface || 'emoji_package_id' in elem)) {
+                this.log.warn('QQ asface 转贴纸失败，回退为 URL 直传', {
+                  qqMessageId: event.messageId,
+                  qqRoomId: pair.qqRoomId,
+                  sourceFile: elem.file,
+                  sourceUrl: 'url' in elem ? elem.url : undefined,
+                });
+              }
               // 下载失败让 Telegram 服务器下载
               if (/^https?:\/\//.test(url)) {
                 files.push(url);
@@ -666,6 +691,26 @@ export default class ForwardService {
       replyTo && (messageToSend.replyTo = replyTo);
 
       let tgMessage: Api.Message;
+      const logQqAsfaceTgResult = (messages: Api.Message | Api.Message[]) => {
+        if (!hasQqAsface) return;
+        const list = Array.isArray(messages) ? messages : [messages];
+        for (const item of list) {
+          const media = item.media;
+          const document = media instanceof Api.MessageMediaDocument && media.document instanceof Api.Document ? media.document : null;
+          const attrClasses = document?.attributes?.map(attr => attr.className) || [];
+          const isSticker = attrClasses.includes('DocumentAttributeSticker');
+          this.log.debug('QQ asface Telegram 发送结果', {
+            qqMessageId: event.messageId,
+            qqRoomId: pair.qqRoomId,
+            tgMessageId: item.id,
+            mediaClass: media?.className,
+            documentMimeType: document?.mimeType,
+            documentSize: document?.size?.toString?.(),
+            documentAttrClasses: attrClasses,
+            isSticker,
+          });
+        }
+      };
       try {
         if (Array.isArray(messageToSend.file) && messageToSend.file.length > 10) {
           const sentMessages: Api.Message[] = [];
@@ -690,9 +735,11 @@ export default class ForwardService {
             }
           }
           tgMessage = sentMessages[0];
+          logQqAsfaceTgResult(sentMessages);
           return { tgMessage: sentMessages, richHeaderUsed };
         }
         tgMessage = await pair.tg.sendMessage(messageToSend);
+        logQqAsfaceTgResult(tgMessage);
       }
       catch (e) {
         if (richHeaderUsed) {
