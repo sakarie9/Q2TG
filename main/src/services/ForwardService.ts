@@ -449,7 +449,7 @@ export default class ForwardService {
                 try {
                   const file = await helper.downloadToCustomFile(url, !(message || messageHeader), elem.name);
                   const type = await helper.fileTypeFromCustomFile(file);
-                  if (file instanceof CustomFile && type.mime.startsWith('image/') && file.size > 10 * 1024 * 1024) {
+                  if (file instanceof CustomFile && type?.mime?.startsWith('image/') && file.size > 10 * 1024 * 1024) {
                     this.log.info('强制使用文件发送');
                     forceDocument = true;
                   }
