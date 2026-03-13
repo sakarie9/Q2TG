@@ -323,14 +323,30 @@ export default class ForwardService {
             break;
           }
           case 'video':
-            // 先获取 URL，要传给下面
+            // 先获取 URL，要传给下面。NapCat 的 video 可能只有 file/fid。
             if (!(elem as any).url) {
               url = await pair.qq.getVideoUrl(elem.fid, elem.md5);
             }
           case 'image':
-            if ('url' in elem)
+            if ('url' in elem && typeof elem.url === 'string') {
               url = elem.url;
-            if (this.oicq instanceof NapCatClient && !url.startsWith('http')) {
+            }
+            if (!url && 'file' in elem && typeof elem.file === 'string') {
+              url = elem.file;
+            }
+            if (!url && 'fid' in elem && typeof elem.fid === 'string') {
+              url = elem.fid;
+            }
+            if (!url) {
+              this.log.warn('媒体 URL 为空，跳过媒体上传', {
+                type: elem.type,
+                messageId: event.messageId,
+                roomId: pair.qqRoomId,
+              });
+              message += elem.type === 'video' ? '<i>[视频]</i>' : '<i>[图片]</i>';
+              break;
+            }
+            if (this.oicq instanceof NapCatClient && !/^https?:\/\//.test(url) && !url.startsWith('file://')) {
               const ret = await this.oicq.callApi('download_file', { url: 'file://' + url });
               url = ret.file;
               tempFiles.push({
@@ -376,7 +392,12 @@ export default class ForwardService {
               this.log.error('下载媒体失败', e);
               posthog.capture('下载媒体失败', { error: e });
               // 下载失败让 Telegram 服务器下载
-              files.push(url);
+              if (/^https?:\/\//.test(url)) {
+                files.push(url);
+              }
+              else {
+                message += elem.type === 'video' ? '<i>[视频下载失败]</i>' : '<i>[图片下载失败]</i>';
+              }
             }
             break;
           case 'flash': {
