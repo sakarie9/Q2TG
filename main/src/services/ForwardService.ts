@@ -42,6 +42,7 @@ import memberRoleCache from '../helpers/memberRoleCache';
 import type { GroupRole } from '@icqqjs/icqq/lib/common';
 import path from 'path';
 import { fileTypeFromBuffer, fileTypeFromFile, FileTypeResult } from 'file-type';
+import sharp from 'sharp';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
@@ -379,6 +380,36 @@ export default class ForwardService {
                   workers: 2,
                 });
                 const fileType = await fileTypeFromFile(res);
+                const attributes: Api.TypeDocumentAttribute[] = [new Api.DocumentAttributeSticker({
+                  alt: '猫',
+                  stickerset: new Api.InputStickerSetEmpty(),
+                })];
+                if (fileType?.mime === 'image/webp') {
+                  try {
+                    const imageMetadata = await sharp(res).metadata();
+                    if (imageMetadata.width && imageMetadata.height) {
+                      attributes.unshift(new Api.DocumentAttributeImageSize({
+                        w: imageMetadata.width,
+                        h: imageMetadata.height,
+                      }));
+                      this.log.debug('QQ asface 转贴纸尺寸元数据', {
+                        qqMessageId: event.messageId,
+                        qqRoomId: pair.qqRoomId,
+                        sourceFile: elem.file,
+                        width: imageMetadata.width,
+                        height: imageMetadata.height,
+                      });
+                    }
+                  }
+                  catch (metaErr) {
+                    this.log.warn('QQ asface 读取 webp 尺寸元数据失败', {
+                      qqMessageId: event.messageId,
+                      qqRoomId: pair.qqRoomId,
+                      sourceFile: elem.file,
+                      error: metaErr?.message,
+                    });
+                  }
+                }
                 this.log.debug('QQ asface 转贴纸文件类型', {
                   qqMessageId: event.messageId,
                   qqRoomId: pair.qqRoomId,
@@ -388,11 +419,8 @@ export default class ForwardService {
                 });
                 useSticker(new Api.InputMediaUploadedDocument({
                   file: upload,
-                  mimeType: fileType.mime,
-                  attributes: [new Api.DocumentAttributeSticker({
-                    alt: '猫',
-                    stickerset: new Api.InputStickerSetEmpty(),
-                  })],
+                  mimeType: fileType?.mime || 'image/webp',
+                  attributes,
                 }));
               }
               else {
