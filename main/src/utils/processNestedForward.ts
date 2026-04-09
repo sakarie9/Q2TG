@@ -8,8 +8,7 @@ export default async function processNestedForward(messages: ForwardMessage[], f
     for (let i = 0; i < message.message.length; i++) {
       const elem = message.message[i];
       if (elem.type === 'json') {
-        const parsed = tryProcessJson(elem.data);
-        if (!parsed) continue;
+        const parsed = await forwardHelper.processJson(elem.data);
         if (parsed.type !== 'forward') continue;
         const entity = await getForwardEntity(parsed.resId, parsed.fileName, fromPairId);
         elem.data = JSON.stringify({ type: 'forward', uuid: entity.id });

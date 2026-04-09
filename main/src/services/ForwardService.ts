@@ -503,7 +503,7 @@ export default class ForwardService {
             break;
           }
           case 'json': {
-            const result = helper.processJson(elem.data);
+            const result = await helper.processJson(elem.data);
             switch (result.type) {
               case 'text':
                 message = helper.htmlEscape(result.text);
