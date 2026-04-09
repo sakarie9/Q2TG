@@ -1,4 +1,4 @@
-import { fetchFile } from '../utils/urls';
+import { fetchFile, convertB23ToBv } from '../utils/urls';
 import { CustomFile } from 'telegram/client/uploads';
 import { base64decode } from 'nodejs-base64';
 import { getLogger } from 'log4js';
@@ -85,7 +85,7 @@ export default {
 
   htmlEscape,
 
-  processJson(json: string) {
+  async processJson(json: string) {
     const jsonObj = JSON.parse(json);
     if (jsonObj.app === 'com.tencent.mannounce') {
       try {
@@ -158,6 +158,10 @@ export default {
         let jumpUrl = detail?.qqdocurl || detail?.url;
         if (jumpUrl && !/^https?:\/\//.test(jumpUrl)) {
           jumpUrl = 'https://' + jumpUrl;
+        }
+        // 如果是 b23.tv 链接，转换为 BV 链接
+        if (jumpUrl && jumpUrl.includes('b23.tv/')) {
+          jumpUrl = await convertB23ToBv(jumpUrl);
         }
         if (jumpUrl) {
           return {

@@ -43,3 +43,29 @@ export function getAvatar(room: number | Friend | Group) {
 export function isContainsUrl(msg: string): boolean {
   return msg.includes('https://') || msg.includes('http://');
 }
+
+/**
+ * 将 b23.tv 短链接转换为 bilibili BV 链接
+ * @param url b23.tv 链接
+ * @returns bilibili.com/video/BV... 链接，如果转换失败则返回原链接
+ */
+export async function convertB23ToBv(url: string): Promise<string> {
+  try {
+    const res = await axios.head(url, {
+      maxRedirects: 0,
+      validateStatus: (status) => status === 302,
+      httpsAgent,
+    });
+    const location = res.headers.location;
+    if (location && location.includes('bilibili.com/video/')) {
+      // 提取 BV 链接部分，只保留 https://www.bilibili.com/video/BVxxx
+      const match = location.match(/(https:\/\/www\.bilibili\.com\/video\/[A-Za-z0-9]+)/);
+      if (match) {
+        return match[1];
+      }
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
