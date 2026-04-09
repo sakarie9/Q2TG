@@ -6,7 +6,7 @@ const processNestedForward = async (messages: ForwardMessage[], fromPairId: numb
   for (const message of messages) {
     for (const elem of message.message) {
       if (elem.type === 'json') {
-        const parsed = forwardHelper.processJson(elem.data);
+        const parsed = await forwardHelper.processJson(elem.data);
         if (parsed.type !== 'forward') continue;
         let entity = await db.forwardMultiple.findFirst({ where: { resId: parsed.resId } });
         if (!entity) {
