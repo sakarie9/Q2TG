@@ -25,6 +25,31 @@ const htmlEscape = (text: string) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+const normalizeMusicJumpUrl = (jumpUrl: string) => {
+  if (!jumpUrl) return jumpUrl;
+
+  let normalizedUrl = jumpUrl;
+  if (!/^https?:\/\//.test(normalizedUrl)) {
+    normalizedUrl = `https://${normalizedUrl}`;
+  }
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host.includes('music.163.com')) {
+      const songId = parsed.searchParams.get('id');
+      if (songId) {
+        return `https://music.163.com/#/song?id=${songId}`;
+      }
+    }
+  }
+  catch {
+    // ignore parse error and return original normalized url
+  }
+
+  return normalizedUrl;
+};
+
 const bufferOrPathCustomFile = (filename: string, bufferOrPath: Buffer | string) => {
   if (!bufferOrPath) throw new Error('[bufferOrPathCustomFile] bufferOrPath is empty');
   const isBuffer = Buffer.isBuffer(bufferOrPath);
@@ -175,6 +200,33 @@ export default {
       catch (err) {
         log.error('解析小程序分享时出错', err);
         posthog.capture('解析小程序分享时出错', { error: err });
+      }
+    }
+    else if (jsonObj.app === 'com.tencent.music.lua') {
+      try {
+        const music = jsonObj.meta?.music;
+        const prompt = jsonObj.prompt?.trim();
+        const title = prompt || music?.title || music?.desc;
+        let jumpUrl = music?.jumpUrl || music?.musicUrl;
+        if (jumpUrl) {
+          jumpUrl = normalizeMusicJumpUrl(jumpUrl);
+        }
+        if (jumpUrl) {
+          return {
+            type: 'text',
+            text: title ? `${title}\n${jumpUrl}` : jumpUrl,
+          };
+        }
+        if (title) {
+          return {
+            type: 'text',
+            text: title,
+          };
+        }
+      }
+      catch (err) {
+        log.error('解析音乐分享时出错', err);
+        posthog.capture('解析音乐分享时出错', { error: err });
       }
     }
     let appurl: string;
