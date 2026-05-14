@@ -1,7 +1,6 @@
 import { computed, defineComponent } from 'vue';
 import type BilibiliMiniApp from '../types/BilibiliMiniApp';
 import type StructMessageCard from '../types/StructMessageCard';
-import { NSpace } from 'naive-ui';
 import { useBrowserLocation } from '@vueuse/core';
 
 export default defineComponent({
@@ -59,11 +58,11 @@ export default defineComponent({
             previewUrl = 'https://' + previewUrl;
           }
           return <a href={appurl} class="c-blue-5" target="_blank">
-            <NSpace vertical>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <p class="font-600">[{meta.title}]</p>
-              <img src={previewUrl} alt={meta.title} referrerpolicy="no-referrer" width={200}/>
+              <img src={previewUrl} alt={meta.title} referrerpolicy="no-referrer" style={{ maxWidth: '200px' }} />
               <p>{meta.desc}</p>
-            </NSpace>
+            </div>
           </a>;
         }
         catch (e) {

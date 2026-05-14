@@ -1,8 +1,6 @@
 import { computed, defineComponent, ref } from 'vue';
-import styles from './index.module.sass';
 import Viewer from './Viewer';
 import testScenarios, { type TestScenario } from './Viewer/testData';
-import { NSelect, NDynamicInput, NButton, NSpace, NTag, NCard, NText } from 'naive-ui';
 
 export default defineComponent({
   setup() {
@@ -11,6 +9,38 @@ export default defineComponent({
       return testScenarios.find(s => s.id === selectedId.value) || testScenarios[0];
     });
     const showInfo = ref(true);
+
+    const selectStyle = {
+      padding: '6px 12px',
+      borderRadius: '6px',
+      border: '1px solid rgba(128,128,128,0.3)',
+      background: 'var(--tg-theme-bg-color, #fff)',
+      color: 'var(--tg-theme-text-color, #000)',
+      fontSize: '14px',
+      minWidth: '200px',
+      outline: 'none',
+      WebkitAppearance: 'none',
+    };
+
+    const btnStyle = {
+      padding: '6px 14px',
+      borderRadius: '6px',
+      border: '1px solid rgba(128,128,128,0.3)',
+      background: 'var(--tg-theme-section-bg-color, #f5f5f5)',
+      color: 'var(--tg-theme-text-color, #000)',
+      fontSize: '13px',
+      cursor: 'pointer',
+      minHeight: '36px',
+    };
+
+    const tagStyle = {
+      padding: '2px 10px',
+      borderRadius: '10px',
+      background: 'var(--tg-theme-link-color, #2A9EF1)',
+      color: '#fff',
+      fontSize: '12px',
+      fontWeight: '500',
+    };
 
     return () => (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -28,23 +58,21 @@ export default defineComponent({
           <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--tg-theme-text-color, #000)' }}>
             🧪 ChatRecord 测试台
           </div>
-          <div style={{ width: '280px' }}>
-            <NSelect
-              value={selectedId.value}
-              onUpdateValue={(val) => { selectedId.value = val; }}
-              options={testScenarios.map(s => ({
-                label: s.name,
-                value: s.id,
-              }))}
-              consistentMenuWidth={false}
-            />
-          </div>
-          <NButton size="small" onClick={() => { showInfo.value = !showInfo.value; }}>
+          <select
+            style={selectStyle}
+            value={selectedId.value}
+            onChange={(e) => { selectedId.value = (e.target as HTMLSelectElement).value; }}
+          >
+            {testScenarios.map(s => (
+              <option value={s.id} key={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <button style={btnStyle} onClick={() => { showInfo.value = !showInfo.value; }}>
             {showInfo.value ? '隐藏信息' : '显示信息'}
-          </NButton>
-          <NTag type="info" size="small">
+          </button>
+          <span style={tagStyle}>
             {selectedScenario.value.messages.length} 条消息
-          </NTag>
+          </span>
           <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--tg-theme-hint-color, #999)' }}>
             独立测试模式 · 无需后端
           </div>
@@ -60,7 +88,7 @@ export default defineComponent({
             color: 'var(--tg-theme-hint-color, #666)',
             flexShrink: 0,
           }}>
-            <NText depth="3">{selectedScenario.value.description}</NText>
+            {selectedScenario.value.description}
           </div>
         )}
 

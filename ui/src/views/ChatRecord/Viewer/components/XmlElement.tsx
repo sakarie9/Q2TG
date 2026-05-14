@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
-import { NImage } from 'naive-ui';
+import { openImagePreview } from '../utils/imagePreview';
 
 export default defineComponent({
   props: {
@@ -23,10 +23,14 @@ export default defineComponent({
       else if (md5ImageRegex.test(props.xml)) {
         const imgMd5 = props.xml.match(md5ImageRegex)![1];
         const url = getImageUrlByMd5(imgMd5);
-        return <NImage
-          width={200}
+        return <img
           src={url}
-          imgProps={{ referrerpolicy: 'no-referrer' }}
+          alt=""
+          referrerpolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
+          style={{ maxWidth: '200px', borderRadius: '4px', marginTop: '4px', cursor: 'pointer' }}
+          onClick={() => openImagePreview(url)}
         />;
       }
       return <div>[XML 卡片]</div>;

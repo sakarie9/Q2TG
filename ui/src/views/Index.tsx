@@ -1,6 +1,15 @@
 import { defineComponent } from 'vue';
-import { NButton, NSpace } from 'naive-ui';
 import { useRouter } from 'vue-router';
+
+const btnBase = {
+  padding: '10px 24px',
+  borderRadius: '8px',
+  border: 'none',
+  fontSize: '15px',
+  fontWeight: '500',
+  cursor: 'pointer',
+  minHeight: '44px',
+};
 
 export default defineComponent({
   setup() {
@@ -8,14 +17,20 @@ export default defineComponent({
     return () => (
       <div class="bg-zinc-1 c-zinc-4 h-100vh flex flex-col items-center justify-center gap-8">
         <div class="text-12 font-500">Q2TG WebUI</div>
-        <NSpace>
-          <NButton type="primary" onClick={() => router.push('/ui/chatRecord')}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            style={{ ...btnBase, background: '#2A9EF1', color: '#fff' }}
+            onClick={() => router.push('/ui/chatRecord')}
+          >
             聊天记录
-          </NButton>
-          <NButton type="warning" onClick={() => router.push('/ui/testChatRecord')}>
+          </button>
+          <button
+            style={{ ...btnBase, background: '#F0A020', color: '#fff' }}
+            onClick={() => router.push('/ui/testChatRecord')}
+          >
             🧪 测试聊天记录
-          </NButton>
-        </NSpace>
+          </button>
+        </div>
       </div>
     );
   },
