@@ -1,23 +1,24 @@
-import { computed, defineComponent, PropType } from 'vue';
+import { computed, defineComponent, PropType, ref, provide } from 'vue';
 import { ForwardMessage } from '@icqqjs/icqq';
 import processHistory from './utils/processHistory';
 import DateContainer from './components/DateContainer';
 import { previewImageUrl, closeImagePreview } from './utils/imagePreview';
+import NestedForwardElement, { FORWARD_PUSH_KEY, ForwardStackOverlay } from './components/NestedForwardElement';
 
 /** 全屏图片预览浮层 */
 const ImagePreviewOverlay = defineComponent({
   setup() {
     return () => previewImageUrl.value ? (
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 flex items-center justify-center"
         style={{
+          zIndex: 60,
           background: 'rgba(0,0,0,0.82)',
           backdropFilter: 'blur(4px)',
           WebkitTapHighlightColor: 'transparent',
         }}
         onClick={closeImagePreview}
       >
-        {/* 关闭按钮 */}
         <button
           class="absolute top-4 right-4 flex items-center justify-center border-none text-white"
           style={{
@@ -29,7 +30,6 @@ const ImagePreviewOverlay = defineComponent({
         >
           ✕
         </button>
-        {/* 图片 */}
         <img
           src={previewImageUrl.value}
           class="max-w-[90vw] max-h-[90vh]"
@@ -55,9 +55,22 @@ export default defineComponent({
   setup(props) {
     const groupedHistory = computed(() => processHistory(props.messages));
 
+    // ── 转发栈导航 ──
+    const forwardStack = ref<ForwardMessage[] | null>(null);
+    provide(FORWARD_PUSH_KEY, (content: ForwardMessage[]) => {
+      forwardStack.value = content;
+    });
+
+    function onStackClose() {
+      forwardStack.value = null;
+    }
+
     return () => (
       <>
-        {groupedHistory.value.map(e => <DateContainer group={e} key={e.date}/>)}
+        {forwardStack.value
+          ? <ForwardStackOverlay messages={forwardStack.value} onClose={onStackClose} />
+          : groupedHistory.value.map(e => <DateContainer group={e} key={e.date}/>)
+        }
         <ImagePreviewOverlay />
       </>
     );
