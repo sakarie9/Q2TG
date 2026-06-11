@@ -2,7 +2,7 @@ import { defineComponent, type PropType, ref } from 'vue';
 import type { ForwardElemExt, MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
-import { openImagePreview } from '../utils/imagePreview';
+import { openImagePreview, downloadImageByUrl } from '../utils/imagePreview';
 import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
 import NestedForwardElement from './NestedForwardElement';
@@ -43,21 +43,39 @@ export default defineComponent({
                    style={{ color: 'var(--tg-theme-subtitle-text-color)' }}>
                 🖼 图片加载失败
               </div>
-            : <img
-                class="mt-1 rounded max-w-50"
-                style={{
-                  maxHeight: '300px',
-                  objectFit: 'cover',
-                  cursor: 'pointer',
-                }}
-                src={url}
-                alt=""
-                referrerpolicy="no-referrer"
-                loading="lazy"
-                decoding="async"
-                onClick={() => url && openImagePreview(url)}
-                onError={() => { imageError.value = true; }}
-              />;
+            : <div class="relative inline-block mt-1 max-w-50" style={{ lineHeight: 0 }}>
+                <img
+                  class="rounded max-w-50"
+                  style={{
+                    maxHeight: '300px',
+                    objectFit: 'cover',
+                    cursor: 'pointer',
+                  }}
+                  src={url}
+                  alt=""
+                  referrerpolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                  onClick={() => url && openImagePreview(url)}
+                  onError={() => { imageError.value = true; }}
+                />
+                <button
+                  class="absolute top-1 right-1 flex items-center justify-center border-none cursor-pointer opacity-0 hover:opacity-100"
+                  style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.45)',
+                    color: '#fff', fontSize: '14px',
+                    transition: 'opacity 0.15s',
+                  }}
+                  onClick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    if (url) downloadImageByUrl(url);
+                  }}
+                  title="下载图片"
+                >
+                  ⬇
+                </button>
+              </div>;
         }
         case 'video-loop':
           return <video src={props.elem.url} autoplay muted loop width={200}/>;
@@ -77,14 +95,32 @@ export default defineComponent({
             0,
             2,
           )}/${props.elem.file.substring(0, 32)}/300x300.png`;
-          return <img
-            src={bfaceUrl}
-            alt={props.elem.text}
-            referrerpolicy="no-referrer"
-            width={200}
-            style={{ cursor: 'pointer' }}
-            onClick={() => openImagePreview(bfaceUrl)}
-          />;
+          return <div class="relative inline-block" style={{ lineHeight: 0 }}>
+            <img
+              src={bfaceUrl}
+              alt={props.elem.text}
+              referrerpolicy="no-referrer"
+              width={200}
+              style={{ cursor: 'pointer' }}
+              onClick={() => openImagePreview(bfaceUrl)}
+            />
+            <button
+              class="absolute top-1 right-1 flex items-center justify-center border-none cursor-pointer opacity-0 hover:opacity-100"
+              style={{
+                width: '28px', height: '28px', borderRadius: '50%',
+                background: 'rgba(0,0,0,0.45)',
+                color: '#fff', fontSize: '14px',
+                transition: 'opacity 0.15s',
+              }}
+              onClick={(e: MouseEvent) => {
+                e.stopPropagation();
+                downloadImageByUrl(bfaceUrl);
+              }}
+              title="下载图片"
+            >
+              ⬇
+            </button>
+          </div>;
         }
         case 'rps':
           return <div>[猜拳]</div>;

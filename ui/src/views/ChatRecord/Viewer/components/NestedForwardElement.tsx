@@ -3,6 +3,7 @@ import type { ForwardMessage } from '@icqqjs/icqq';
 import type { ForwardElemExt, MessageElemExt } from '../types/MessageElemExt';
 import { format } from 'date-fns';
 import MessageElement from './MessageElement';
+import ImagePreviewOverlay from './ImagePreviewOverlay';
 import processHistory from '../utils/processHistory';
 import noAvatar from '../assets/no-avatar.webp';
 import cyrb53 from '../utils/cyrb53';
@@ -343,6 +344,8 @@ export const ForwardStackOverlay = defineComponent({
             to   { transform: translateX(0); opacity: 1; }
           }
         `}</style>
+
+        <ImagePreviewOverlay />
       </div>
     );
   },
