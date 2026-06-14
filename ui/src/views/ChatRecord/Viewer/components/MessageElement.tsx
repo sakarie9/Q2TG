@@ -1,8 +1,8 @@
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent, type PropType, ref } from 'vue';
 import type { ForwardElemExt, MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
-import { NImage } from 'naive-ui';
+import { openImagePreview, downloadImageByUrl } from '../utils/imagePreview';
 import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
 import NestedForwardElement from './NestedForwardElement';
@@ -13,6 +13,8 @@ export default defineComponent({
     elem: { required: true, type: Object as PropType<MessageElemExt> },
   },
   setup(props) {
+    const imageError = ref(false);
+
     return () => {
       switch (props.elem.type) {
         case 'text':
@@ -36,12 +38,44 @@ export default defineComponent({
               url = getImageUrlByMd5(md5);
             }
           }
-          return <NImage
-            class="mt-4px"
-            width={200}
-            src={url}
-            imgProps={{ referrerpolicy: 'no-referrer' }}
-          />;
+          return imageError.value
+            ? <div class="mt-1 p-2 text-xs rounded bg-gray-400/10"
+                   style={{ color: 'var(--tg-theme-subtitle-text-color)' }}>
+                🖼 图片加载失败
+              </div>
+            : <div class="relative inline-block mt-1 max-w-50" style={{ lineHeight: 0 }}>
+                <img
+                  class="rounded max-w-50"
+                  style={{
+                    maxHeight: '300px',
+                    objectFit: 'cover',
+                    cursor: 'pointer',
+                  }}
+                  src={url}
+                  alt=""
+                  referrerpolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                  onClick={() => url && openImagePreview(url)}
+                  onError={() => { imageError.value = true; }}
+                />
+                <button
+                  class="absolute top-1 right-1 flex items-center justify-center border-none cursor-pointer opacity-0 hover:opacity-100"
+                  style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.45)',
+                    color: '#fff', fontSize: '14px',
+                    transition: 'opacity 0.15s',
+                  }}
+                  onClick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    if (url) downloadImageByUrl(url);
+                  }}
+                  title="下载图片"
+                >
+                  ⬇
+                </button>
+              </div>;
         }
         case 'video-loop':
           return <video src={props.elem.url} autoplay muted loop width={200}/>;
@@ -56,12 +90,38 @@ export default defineComponent({
           return <div>[文件] {props.elem.name}</div>;
         case 'location':
           return <div>[地址] {props.elem.name}<br/>{props.elem.address}</div>;
-        case 'bface':
-          let url = `https://gxh.vip.qq.com/club/item/parcel/item/${props.elem.file.substring(
+        case 'bface': {
+          const bfaceUrl = `https://gxh.vip.qq.com/club/item/parcel/item/${props.elem.file.substring(
             0,
             2,
           )}/${props.elem.file.substring(0, 32)}/300x300.png`;
-          return <img src={url} alt={props.elem.text} referrerpolicy="no-referrer" width={200}/>;
+          return <div class="relative inline-block" style={{ lineHeight: 0 }}>
+            <img
+              src={bfaceUrl}
+              alt={props.elem.text}
+              referrerpolicy="no-referrer"
+              width={200}
+              style={{ cursor: 'pointer' }}
+              onClick={() => openImagePreview(bfaceUrl)}
+            />
+            <button
+              class="absolute top-1 right-1 flex items-center justify-center border-none cursor-pointer opacity-0 hover:opacity-100"
+              style={{
+                width: '28px', height: '28px', borderRadius: '50%',
+                background: 'rgba(0,0,0,0.45)',
+                color: '#fff', fontSize: '14px',
+                transition: 'opacity 0.15s',
+              }}
+              onClick={(e: MouseEvent) => {
+                e.stopPropagation();
+                downloadImageByUrl(bfaceUrl);
+              }}
+              title="下载图片"
+            >
+              ⬇
+            </button>
+          </div>;
+        }
         case 'rps':
           return <div>[猜拳]</div>;
         case 'dice':

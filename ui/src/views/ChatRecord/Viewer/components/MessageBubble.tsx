@@ -1,7 +1,7 @@
 import { defineComponent, PropType } from 'vue';
 import MessageElement from './MessageElement';
 import styles from './Bubble.module.sass';
-import { NTime } from 'naive-ui';
+import { format } from 'date-fns';
 import type { ForwardMessage } from '@icqqjs/icqq';
 
 export default defineComponent({
@@ -12,10 +12,7 @@ export default defineComponent({
     return () => <div class={styles.container}>
       {props.message.message.map((i, k) => <MessageElement elem={i} key={k}/>)}
       <div class={styles.time}>
-        <NTime
-          time={(props.message.time) * 1000}
-          format="HH:mm"
-        />
+        {format((props.message.time) * 1000, 'HH:mm')}
       </div>
     </div>;
   },
