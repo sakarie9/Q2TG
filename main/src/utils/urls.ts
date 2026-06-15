@@ -2,6 +2,48 @@ import axios from 'axios';
 import { Friend, Group } from '../client/QQClient';
 import * as https from 'node:https';
 
+/**
+ * 生成 QQ 用户头像 URL
+ * @param uin QQ 号
+ * @param size 头像尺寸，默认 0
+ */
+export function getQQUserAvatarUrl(uin: number | string, size = 0): string {
+  return `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=${size}`;
+}
+
+/**
+ * 获取经过验证的 QQ 用户头像 URL。
+ * 仅当使用默认 size（s=0）时，通过 HEAD 请求检查 Last-Modified 头；
+ * 若异常（年份 ≤ 1990）则 fallback 到 s=100。
+ * 若调用者传入了非默认的 size，则不做检查直接返回。
+ */
+export async function getValidQQUserAvatarUrl(uin: number | string, size = 0): Promise<string> {
+  // 传入了非默认 size，直接保留不做检查
+  if (size !== 0) {
+    return getQQUserAvatarUrl(uin, size);
+  }
+
+  const url = getQQUserAvatarUrl(uin, 0);
+
+  try {
+    const res = await axios.head(url, { httpsAgent });
+    const lastModified = res.headers['last-modified'];
+
+    if (lastModified) {
+      const d = new Date(lastModified);
+      // Last-Modified: Mon, 01 Jan 1990 00:00:00 GMT 表示头像不存在
+      if (d.getFullYear() <= 1990) {
+        return getQQUserAvatarUrl(uin, 100);
+      }
+    }
+  } catch {
+    // HEAD 请求失败，fallback 到 s=100
+    return getQQUserAvatarUrl(uin, 100);
+  }
+
+  return url;
+}
+
 export function getAvatarUrl(room: number | bigint | Friend | Group): string {
   if (!room) return '';
   if (typeof room === 'object' && 'uin' in room) {
@@ -12,7 +54,7 @@ export function getAvatarUrl(room: number | bigint | Friend | Group): string {
   }
   return room < 0 ?
     `https://p.qlogo.cn/gh/${-room}/${-room}/0` :
-    `https://q1.qlogo.cn/g?b=qq&nk=${room}&s=0`;
+    getQQUserAvatarUrl(Number(room));
 }
 
 export function getImageUrlByMd5(md5: string) {
@@ -38,7 +80,23 @@ export async function fetchFile(url: string): Promise<Buffer> {
   return res.data;
 }
 
-export function getAvatar(room: number | Friend | Group) {
+function resolveUin(room: number | Friend | Group): number {
+  if (typeof room === 'object' && 'uin' in room) {
+    return Number(room.uin);
+  }
+  if (typeof room === 'object' && 'gid' in room) {
+    return -room.gid;
+  }
+  return Number(room);
+}
+
+export async function getAvatar(room: number | Friend | Group) {
+  const uin = resolveUin(room);
+  if (uin > 0) {
+    // 用户头像：使用验证后的 URL
+    const url = await getValidQQUserAvatarUrl(uin);
+    return fetchFile(url);
+  }
   return fetchFile(getAvatarUrl(room));
 }
 
