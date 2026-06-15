@@ -43,12 +43,30 @@ export default {
     return bufSilk;
   },
 
-  async decode(bufSilk: Buffer, outputPath: string): Promise<void> {
-    const bufPcm = silk.decode(bufSilk);
-    const { path, cleanup } = await file();
-    await fsP.writeFile(path, bufPcm);
-    await conventPcmToOgg(path, outputPath);
-    cleanup();
+  async decode(buf: Buffer, outputPath: string): Promise<void> {
+    // NapCat 下载的语音可能是 AMR 格式，检测文件头以区分
+    const header = buf.subarray(0, 10).toString();
+    if (header.startsWith('#!AMR')) {
+      // AMR 格式：直接用 ffmpeg 转码为 OGG
+      const { path, cleanup } = await file();
+      await fsP.writeFile(path, buf);
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(path)
+          .outputFormat('ogg')
+          .outputOptions(['-ar', '24000', '-ac', '1'])
+          .on('end', () => resolve())
+          .on('error', reject)
+          .save(outputPath);
+      });
+      await cleanup();
+    } else {
+      // SILK 格式（原有逻辑）
+      const bufPcm = silk.decode(buf);
+      const { path, cleanup } = await file();
+      await fsP.writeFile(path, bufPcm);
+      await conventPcmToOgg(path, outputPath);
+      cleanup();
+    }
   },
 
   conventOggToPcm16000: (oggPath: string, tmpFilePath: string): Promise<void> => {
