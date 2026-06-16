@@ -717,16 +717,30 @@ export default class ForwardService {
         // 测试 Web Preview 内容是否被正确获取
         setTimeout(async () => {
           // Telegram Bot 账号无法获取 Web 预览内容，只能用 User 账号获取
-          const userMessage = await pair.tgUser.getMessage({
-            ids: tgMessage.id,
-          });
-          if (['WebPage', 'WebPageNotModified'].includes((userMessage?.media as Api.MessageMediaWebPage)?.webpage?.className))
-            return;
-          // 没有正常获取的话，就加上原先的头部
-          this.log.warn('Rich Header 回测错误', messageToSend.file);
-          await tgMessage.edit({
-            text: messageHeaderWithLink + (message && messageHeaderWithLink ? '\n' : '') + message,
-          });
+          const checkWebPreview = async (retries = 0): Promise<void> => {
+            const userMessage = await pair.tgUser.getMessage({
+              ids: tgMessage.id,
+            });
+            const webpage = (userMessage?.media as Api.MessageMediaWebPage)?.webpage;
+            if (['WebPage', 'WebPageNotModified'].includes(webpage?.className))
+              return;
+            // 网页预览还在抓取中（WebPagePending），稍后重试，最多等约 30 秒
+            if (webpage?.className === 'WebPagePending' && retries < 10) {
+              setTimeout(() => checkWebPreview(retries + 1), 3000);
+              return;
+            }
+            // 用户账号可能还未同步到该消息，稍后重试
+            if (!webpage && retries < 5) {
+              setTimeout(() => checkWebPreview(retries + 1), 2000);
+              return;
+            }
+            // 没有正常获取的话，就加上原先的头部
+            this.log.warn('Rich Header 回测错误', messageToSend.file);
+            await tgMessage.edit({
+              text: messageHeaderWithLink + (message && messageHeaderWithLink ? '\n' : '') + message,
+            });
+          };
+          await checkWebPreview();
         }, 3000);
       }
 
