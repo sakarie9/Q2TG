@@ -16,6 +16,7 @@ export default function (sourcePath: string, targetPath: string, format: string,
       }
       if (format === 'webm') {
         ff.videoCodec('libvpx-vp9');
+        ff.addOutputOption('-pix_fmt', 'yuva420p');
       }
       ff.toFormat(format).save(targetPath);
       logger.debug('正在启动 ffmpeg: ' + ff._getArguments().join(' '));
