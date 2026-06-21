@@ -63,7 +63,7 @@ export default class ConfigController {
     }
     else if (message.isPrivate) {
       switch (messageSplit[0]) {
-        case '/userbot_login':
+        case '/relogin':
           try {
             await this.instance.loginUserBotWithQrCode();
           }

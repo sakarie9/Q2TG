@@ -129,7 +129,7 @@ export default class SetupController {
     catch (e) {
       this.log.error('创建 UserBot 失败，继续以 Bot 模式完成配置', e);
       posthog.capture('创建 UserBot 失败', { error: e });
-      await this.setupService.informOwner(`UserBot 登录失败，已继续以 Bot 模式完成配置。\n之后可发送 /userbot_login 重新扫码登录。\n<code>${e.message}</code>`);
+      await this.setupService.informOwner(`UserBot 登录失败，已继续以 Bot 模式完成配置。\n之后可发送 /relogin 重新扫码登录。\n<code>${e.message}</code>`);
     }
   }
 
