@@ -9,6 +9,7 @@ import noAvatar from '../assets/no-avatar.webp';
 export default defineComponent({
   props: {
     group: { required: true, type: Object as PropType<SenderGroup> },
+    uuid: { required: true, type: String },
   },
   setup(props) {
     return () => <div class={styles.container}>
@@ -25,7 +26,7 @@ export default defineComponent({
       <div class={styles.mainContainer}>
         <SenderNameBubble name={props.group.username} id={props.group.senderId}/>
         {props.group.messages.map((e, index) =>
-          <MessageBubble message={e} key={index}/>)}
+          <MessageBubble message={e} uuid={props.uuid} key={index}/>)}
       </div>
     </div>;
   },

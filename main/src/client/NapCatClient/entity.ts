@@ -3,7 +3,7 @@ import { NapCatClient } from './client';
 import { messageElemToNapCatSendable, napCatForwardMultiple, napCatReceiveToMessageElem } from './convert';
 import { getLogger, Logger } from 'log4js';
 import posthog from '../../models/posthog';
-import type { Send, WSSendReturn } from 'node-napcat-ts';
+import type { SendMessageSegment, WSSendReturn } from 'node-napcat-ts';
 import { FileResult } from 'tmp-promise';
 
 const createSpoilerExtra = (chain: Sendable) => {
@@ -58,7 +58,7 @@ export abstract class NapCatEntity implements QQEntity {
     }
   }
 
-  protected abstract sendMsgImpl(message: Send[keyof Send][], extra?: Record<string, any>): Promise<MessageRet>;
+  protected abstract sendMsgImpl(message: SendMessageSegment[], extra?: Record<string, any>): Promise<MessageRet>;
 
   async sendMsg(content: Sendable, source?: Quotable, isSpoiler?: boolean): Promise<MessageRet> {
     if (!Array.isArray(content)) {
@@ -94,7 +94,7 @@ export abstract class NapCatEntity implements QQEntity {
 
   // 文件会被下载，返回的是绝对路径
   async getFileUrl(fid: string): Promise<string> {
-    const data = await this.client.callApi('get_file', { file_id: fid });
+    const data = await this.client.callApi('get_file', { file: fid });
     return data.file;
   }
 }
@@ -108,7 +108,7 @@ abstract class NapCatUser extends NapCatEntity implements QQUser {
     super(client);
   }
 
-  protected async sendMsgImpl(message: Send[keyof Send][], extra = {}): Promise<MessageRet> {
+  protected async sendMsgImpl(message: SendMessageSegment[], extra = {}): Promise<MessageRet> {
     const data = await this.client.callApi('send_private_msg', {
       user_id: this.uin,
       ...extra,
@@ -232,7 +232,7 @@ export class NapCatGroup extends NapCatEntity implements Group {
     return data;
   }
 
-  protected async sendMsgImpl(message: Send[keyof Send][], extra = {}): Promise<MessageRet> {
+  protected async sendMsgImpl(message: SendMessageSegment[], extra = {}): Promise<MessageRet> {
     const data = await this.client.callApi('send_group_msg', {
       group_id: this.gid,
       ...extra,

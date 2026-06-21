@@ -47,7 +47,7 @@ export default function processHistory(history: ForwardMessage[]) {
         avatar,
       };
     }
-    currentSenderGroup.messages.push(current);
+    currentSenderGroup.messages.push({ ...current, messageIndex: i });
   }
   // 收工啦
   if (currentSenderGroup)

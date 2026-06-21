@@ -129,9 +129,10 @@ model AvatarCache {
 }
 
 model ForwardMultiple {
-  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  resId      String
-  fileName   String
-  fromPairId Int
-  fromPair   ForwardPair @relation(fields: [fromPairId], references: [id], onDelete: Cascade)
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resId          String
+  fileName       String?
+  cachedMessages Json?
+  fromPairId     Int
+  fromPair       ForwardPair @relation(fields: [fromPairId], references: [id], onDelete: Cascade)
 }

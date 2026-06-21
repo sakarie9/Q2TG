@@ -1,17 +1,60 @@
-import { defineComponent, type PropType } from 'vue';
+import { defineComponent, ref, type PropType } from 'vue';
 import type { MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
-import { NImage } from 'naive-ui';
+import { NButton, NImage, NSpace } from 'naive-ui';
 import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
 import linkifyStr from 'linkify-string';
+import client from '@/utils/client';
 
 export default defineComponent({
   props: {
     elem: { required: true, type: Object as PropType<MessageElemExt> },
+    uuid: { required: true, type: String },
+    path: { required: true, type: Object as PropType<number[]> },
   },
   setup(props) {
+    const saving = ref(false);
+    const error = ref('');
+
+    const saveMedia = async () => {
+      saving.value = true;
+      error.value = '';
+      try {
+        const result = await client.Q2tgServlet.DownloadForwardMultipleMediaApi.post({
+          uuid: props.uuid,
+          path: props.path,
+        });
+        if (result.error) {
+          error.value = result.error.value?.message || result.error.message;
+          return;
+        }
+        Object.assign(props.elem, result.data);
+      }
+      catch (e: any) {
+        error.value = e.message;
+      }
+      finally {
+        saving.value = false;
+      }
+    };
+
+    const saveButton = () => {
+      if (!['image', 'flash', 'video', 'record', 'file'].includes(props.elem.type) || props.elem.localUrl) {
+        return null;
+      }
+      return <NButton class="mt-4px" size="tiny" loading={saving.value} onClick={saveMedia}>
+        保存到服务端
+      </NButton>;
+    };
+
+    const mediaWrap = (content: any) => <NSpace vertical size={4}>
+      {content}
+      {saveButton()}
+      {error.value && <div class="text-red-5 text-12px">{error.value}</div>}
+    </NSpace>;
+
     return () => {
       switch (props.elem.type) {
         case 'text':
@@ -25,7 +68,7 @@ export default defineComponent({
           })}></div>;
         case 'image':
         case 'flash': {
-          let url = props.elem.url;
+          let url = props.elem.localUrl || props.elem.url;
           let md5;
           if (!url && typeof props.elem.file === 'string') {
             md5 = props.elem.file.substring(0, 32);
@@ -35,12 +78,13 @@ export default defineComponent({
               url = getImageUrlByMd5(md5);
             }
           }
-          return <NImage
-            class="mt-4px"
-            width={200}
-            src={url}
-            imgProps={{ referrerpolicy: 'no-referrer' }}
-          />;
+          return mediaWrap(<NImage
+              class="mt-4px"
+              width={200}
+              src={url}
+              imgProps={{ referrerpolicy: 'no-referrer' }}
+            />,
+          );
         }
         case 'video-loop':
           return <video src={props.elem.url} autoplay muted loop width={200}/>;
@@ -48,11 +92,17 @@ export default defineComponent({
           return <tgs-player autoplay={true} loop={true} mode="normal" src={props.elem.url}
                              style={{ width: 200, height: 200 }}/>;
         case 'video':
-          return <div>[视频]</div>;
+          return mediaWrap(props.elem.localUrl || props.elem.url ?
+            <video src={props.elem.localUrl || props.elem.url} controls width={240}/> :
+            <div>[视频]</div>);
         case 'record':
-          return <div>[语音]</div>;
+          return mediaWrap(props.elem.localUrl || props.elem.url ?
+            <audio src={props.elem.localUrl || props.elem.url} controls/> :
+            <div>[语音]</div>);
         case 'file':
-          return <div>[文件] {props.elem.name}</div>;
+          return mediaWrap(props.elem.localUrl ?
+            <a class="c-blue-5" href={props.elem.localUrl} target="_blank">[文件] {props.elem.name}</a> :
+            <div>[文件] {props.elem.name}</div>);
         case 'location':
           return <div>[地址] {props.elem.name}<br/>{props.elem.address}</div>;
         case 'bface':

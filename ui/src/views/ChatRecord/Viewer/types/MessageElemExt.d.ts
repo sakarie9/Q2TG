@@ -14,15 +14,23 @@ type ImageElem = {
   type: 'image' | 'flash'
   file?: string
   url?: string
+  localUrl?: string
+  downloadStatus?: 'idle' | 'cached' | 'unsupported'
 }
 
 type MediaElem = {
   type: 'video' | 'record'
+  file?: string
+  url?: string
+  localUrl?: string
+  downloadStatus?: 'idle' | 'cached' | 'unsupported'
 }
 
 type FileElem = {
   type: 'file'
   name: string
+  localUrl?: string
+  downloadStatus?: 'idle' | 'cached' | 'unsupported'
 }
 
 type LocationElem = {

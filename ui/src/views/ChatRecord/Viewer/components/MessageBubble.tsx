@@ -7,10 +7,12 @@ import type { ForwardMessage } from '../types/ForwardMessage';
 export default defineComponent({
   props: {
     message: { required: true, type: Object as PropType<ForwardMessage> },
+    uuid: { required: true, type: String },
   },
   setup(props) {
     return () => <div class={styles.container}>
-      {props.message.message.map((i, k) => <MessageElement elem={i} key={k}/>)}
+      {props.message.message.map((i, k) =>
+        <MessageElement elem={i} uuid={props.uuid} path={[props.message.messageIndex!, k]} key={k}/>)}
       <div class={styles.time}>
         <NTime
           time={(props.message.time) * 1000}

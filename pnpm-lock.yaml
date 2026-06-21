@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  telegram@2.26.8:
-    hash: 6ezi5zx3h54zaimfvrhyk2gpfa
-    path: patches/telegram@2.26.8.patch
+  telegram@2.26.22:
+    hash: 2ylnutk37a2vfsgy3jyvk4ae4u
+    path: patches/telegram@2.26.22.patch
 
 importers:
 
@@ -126,8 +126,8 @@ importers:
         specifier: ^2.1.35
         version: 2.1.35
       node-napcat-ts:
-        specifier: ^0.4.1
-        version: 0.4.1(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+        specifier: ^0.4.25
+        version: 0.4.25(bufferutil@4.0.8)(utf-8-validate@5.0.10)
       nodejs-base64:
         specifier: ^2.0.0
         version: 2.0.0
@@ -141,8 +141,8 @@ importers:
         specifier: ^4.4.0
         version: 4.4.0
       telegram:
-        specifier: ^2.26.8
-        version: 2.26.8(patch_hash=6ezi5zx3h54zaimfvrhyk2gpfa)
+        specifier: ^2.26.22
+        version: 2.26.22(patch_hash=2ylnutk37a2vfsgy3jyvk4ae4u)
       tmp-promise:
         specifier: ^3.0.3
         version: 3.0.3
@@ -2783,8 +2783,8 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nanoid@5.0.9:
-    resolution: {integrity: sha512-Aooyr6MXU6HpvvWXKoVoXwKMs/KyVakWwg7xQfv5/S/RIgJMy0Ifa45H9qqYy7pTCszrHzP21Uk4PZq2HpEM8Q==}
+  nanoid@5.1.15:
+    resolution: {integrity: sha512-kBg3RpGtIe+RpTbyXwoI6pk5yD7KUiI3sygUqgeBMRst42KmhB4RZC7eiO9Wa1HIpaCCtpE2DJ6OI4Wi5ebwFw==}
     engines: {node: ^18 || >=20}
     hasBin: true
 
@@ -2825,8 +2825,8 @@ packages:
     resolution: {integrity: sha512-vv8fJuOUCCvSPjDjBLlMqYMHob4aGjkmrkaE42/mZr0VT+ZAU10jRF8oTnX9+pgU9/vYJ8P7YT3Vd6ajkmzSCw==}
     engines: {node: '>=0.12'}
 
-  node-napcat-ts@0.4.1:
-    resolution: {integrity: sha512-rUy9bn0nAU+VtxghxHxp7xYpMzWibh/WwSs/3S2zV6oWXcRax9Q0ypcp55VZEkpoJ/ieC17OkxxPz92UP/m2Ug==}
+  node-napcat-ts@0.4.25:
+    resolution: {integrity: sha512-Yp/+JNJ65DnCnNJzxVP/kqkRXdDHM4hVM3MLuYvoGFaT3gCclSyuEiZ5tL5ADVrWxWHMtJJaV5yJVSrBsrIR/w==}
 
   node-releases@2.0.19:
     resolution: {integrity: sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==}
@@ -3330,8 +3330,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  telegram@2.26.8:
-    resolution: {integrity: sha512-5sIb43Fd7HxjXQZqKWMhNTmdMOlG3QkuhR2xPleUA5B8BxOZl9IwrDwFdiC7aezGVTcD6oJ1d4cloUySjmCX/A==}
+  telegram@2.26.22:
+    resolution: {integrity: sha512-EIj7Yrjiu0Yosa3FZ/7EyPg9s6UiTi/zDQrFmR/2Mg7pIUU+XjAit1n1u9OU9h2oRnRM5M+67/fxzQluZpaJJg==}
 
   timm@1.7.1:
     resolution: {integrity: sha512-IjZc9KIotudix8bMaBW6QvMuq64BrJWFs1+4V0lXwWGQZwH+LnX87doAYhem4caOEusRP9/g6jVDQmZ8XOk1nw==}
@@ -3656,8 +3656,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.18.0:
-    resolution: {integrity: sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==}
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -5957,9 +5957,9 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  isomorphic-ws@5.0.0(ws@8.18.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)):
+  isomorphic-ws@5.0.0(ws@8.21.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)):
     dependencies:
-      ws: 8.18.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+      ws: 8.21.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)
 
   jackspeak@3.4.3:
     dependencies:
@@ -6290,7 +6290,7 @@ snapshots:
 
   nanoid@3.3.8: {}
 
-  nanoid@5.0.9: {}
+  nanoid@5.1.15: {}
 
   napi-build-utils@1.0.2: {}
 
@@ -6316,11 +6316,11 @@ snapshots:
     dependencies:
       write-file-atomic: 1.3.4
 
-  node-napcat-ts@0.4.1(bufferutil@4.0.8)(utf-8-validate@5.0.10):
+  node-napcat-ts@0.4.25(bufferutil@4.0.8)(utf-8-validate@5.0.10):
     dependencies:
-      isomorphic-ws: 5.0.0(ws@8.18.0(bufferutil@4.0.8)(utf-8-validate@5.0.10))
-      nanoid: 5.0.9
-      ws: 8.18.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+      isomorphic-ws: 5.0.0(ws@8.21.0(bufferutil@4.0.8)(utf-8-validate@5.0.10))
+      nanoid: 5.1.15
+      ws: 8.21.0(bufferutil@4.0.8)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -6874,7 +6874,7 @@ snapshots:
       - encoding
       - supports-color
 
-  telegram@2.26.8(patch_hash=6ezi5zx3h54zaimfvrhyk2gpfa):
+  telegram@2.26.22(patch_hash=2ylnutk37a2vfsgy3jyvk4ae4u):
     dependencies:
       '@cryptography/aes': 0.1.1
       async-mutex: 0.3.2
@@ -7203,7 +7203,7 @@ snapshots:
       bufferutil: 4.0.8
       utf-8-validate: 5.0.10
 
-  ws@8.18.0(bufferutil@4.0.8)(utf-8-validate@5.0.10):
+  ws@8.21.0(bufferutil@4.0.8)(utf-8-validate@5.0.10):
     optionalDependencies:
       bufferutil: 4.0.8
       utf-8-validate: 5.0.10

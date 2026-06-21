@@ -42,7 +42,7 @@ export default defineComponent({
           {error.value || '出错了'}
         </div>;
       return <div class={styles.container}>
-        <Viewer messages={data.value}/>
+        <Viewer messages={data.value} uuid={uuid.value!}/>
       </div>;
     };
   },

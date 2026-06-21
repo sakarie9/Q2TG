@@ -297,7 +297,7 @@ export default class ConfigService {
       // 创建
       filter = new Api.DialogFilter({
         id: DEFAULT_FILTER_ID,
-        title: 'QQ',
+        title: new Api.TextWithEntities({ text: 'QQ', entities: [] }),
         pinnedPeers: [
           (await tgUser.getChat(this.tgBot.me.username)).inputPeer,
         ],

@@ -1,4 +1,4 @@
-import type { Receive, Send, WSSendReturn } from 'node-napcat-ts';
+import type { Receive, SendMessageSegment, WSSendReturn } from 'node-napcat-ts';
 import { FaceElem, ForwardMessage, ImageElem, MessageElem, SendableElem } from '../QQClient';
 import { file as createTempFileBase, FileResult } from 'tmp-promise';
 import fsP from 'fs/promises';
@@ -11,8 +11,8 @@ const createTempFile = (options: Parameters<typeof createTempFileBase>[0] = {}) 
   ...options,
 });
 
-export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{ elem: Send[keyof Send], tempFiles: FileResult[] }> => {
-  const noTmp = (elem: Send[keyof Send]) => ({
+export const messageElemToNapCatSendable = async (elem: SendableElem): Promise<{ elem: SendMessageSegment, tempFiles: FileResult[] }> => {
+  const noTmp = (elem: SendMessageSegment) => ({
     elem,
     tempFiles: [],
   });
@@ -120,7 +120,7 @@ export const napCatReceiveToMessageElem = (data: Receive[keyof Receive]): Messag
       return {
         ...data.data,
         type: data.type,
-        asface: 'sub_type' in data.data && parseInt(data.data.sub_type) > 0,
+        asface: 'sub_type' in data.data && parseInt(String(data.data.sub_type)) > 0,
       } as any;
     // @ts-ignore
     case 'mface':

@@ -7,6 +7,7 @@ export type ForwardMessage = {
   group_id?: number
   time: number
   seq: number
+  messageIndex?: number
   message: MessageElemExt[]
   raw_message: string
 }

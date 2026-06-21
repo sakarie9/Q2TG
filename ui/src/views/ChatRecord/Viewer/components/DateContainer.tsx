@@ -6,6 +6,7 @@ import SenderContainer from './SenderContainer';
 export default defineComponent({
   props: {
     group: { required: true, type: Object as PropType<DateGroup> },
+    uuid: { required: true, type: String },
   },
   setup(props) {
     return () => <div>
@@ -14,7 +15,7 @@ export default defineComponent({
                 {props.group.date}
             </span>
       </div>
-      {props.group.messages.map(e => <SenderContainer group={e} key={e.id}/>)}
+      {props.group.messages.map(e => <SenderContainer group={e} uuid={props.uuid} key={e.id}/>)}
     </div>;
   },
 });
