@@ -22,7 +22,7 @@ export default class ConfigController {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              private tgUser: Telegram | undefined,
               private readonly qqClient: QQClient) {
     this.log = getLogger(`ConfigController - ${instance.id}`);
     this.configService = new ConfigService(this.instance, tgBot, tgUser, qqClient);
@@ -33,7 +33,19 @@ export default class ConfigController {
     qqClient.addGroupMemberDecreaseEventHandler(this.handleGroupDecrease);
     this.instance.workMode === 'personal' && qqClient.addGroupMemberIncreaseEventHandler(this.handleMemberIncrease);
     this.instance.workMode === 'personal' && qqClient.addFriendIncreaseEventHandler(this.handleFriendIncrease);
-    this.instance.workMode === 'personal' && this.configService.setupFilter();
+    this.setupUserBotFilter();
+  }
+
+  public setUserBot(tgUser?: Telegram) {
+    this.tgUser = tgUser;
+    this.configService.setUserBot(tgUser);
+    this.setupUserBotFilter();
+  }
+
+  private setupUserBotFilter() {
+    if (this.instance.workMode !== 'personal' || !this.tgUser) return;
+    this.configService.setupFilter()
+      .catch(e => this.log.warn('设置 UserBot 文件夹失败', e));
   }
 
   private handleMessage = async (message: Api.Message) => {
@@ -51,6 +63,15 @@ export default class ConfigController {
     }
     else if (message.isPrivate) {
       switch (messageSplit[0]) {
+        case '/userbot_login':
+          try {
+            await this.instance.loginUserBotWithQrCode();
+          }
+          catch (e) {
+            this.log.error('UserBot 扫码登录失败', e);
+            await message.reply({ message: `UserBot 登录失败：<code>${e.message}</code>` });
+          }
+          return true;
         case '/flag':
         case '/flags':
           messageSplit.shift();
@@ -106,8 +127,10 @@ export default class ConfigController {
       pair.tg = await this.tgBot.getChat(message.action.channelId);
       // 升级之后 bot 的管理权限可能没了，需要修复一下
       if (this.instance.workMode === 'personal') {
-        const chatForUser = await this.tgUser.getChat(message.action.channelId);
-        await chatForUser.setAdmin(this.tgBot.me.username);
+        if (this.tgUser) {
+          const chatForUser = await this.tgUser.getChat(message.action.channelId);
+          await chatForUser.setAdmin(this.tgBot.me.username);
+        }
       }
       else {
         await pair.tg.sendMessage({

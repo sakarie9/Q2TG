@@ -25,11 +25,12 @@ import memberRoleCache from '../helpers/memberRoleCache';
 export default class ForwardController {
   private readonly forwardService: ForwardService;
   private readonly log: Logger;
+  private tgUser: Telegram | undefined;
 
   constructor(
     private readonly instance: Instance,
     private readonly tgBot: Telegram,
-    private readonly tgUser: Telegram,
+    tgUser: Telegram | undefined,
     private readonly qqClient: QQClient,
   ) {
     this.log = getLogger(`ForwardController - ${instance.id}`);
@@ -38,9 +39,15 @@ export default class ForwardController {
     qqClient.addGroupMemberIncreaseEventHandler(this.onQqGroupMemberIncrease);
     qqClient.addPokeEventHandler(this.onQqPoke);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
-    tgUser.addNewMessageEventHandler(this.onTelegramUserMessage);
+    this.setUserBot(tgUser);
     tgBot.addEditedMessageEventHandler(this.onTelegramMessage);
     instance.workMode === 'group' && tgBot.addChannelParticipantEventHandler(this.onTelegramParticipant);
+  }
+
+  public setUserBot(tgUser?: Telegram) {
+    if (!tgUser || this.tgUser === tgUser) return;
+    this.tgUser = tgUser;
+    tgUser.addNewMessageEventHandler(this.onTelegramUserMessage);
   }
 
   private onQqMessage = async (event: MessageEvent) => {

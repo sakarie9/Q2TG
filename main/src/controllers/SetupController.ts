@@ -16,9 +16,9 @@ export default class SetupController {
   private readonly setupService: SetupService;
   private readonly log: Logger;
   private isInProgress = false;
-  private waitForFinishCallbacks: Array<(ret: { tgUser: Telegram, qqClient: QQClient }) => unknown> = [];
+  private waitForFinishCallbacks: Array<(ret: { tgUser?: Telegram, qqClient: QQClient }) => unknown> = [];
   // 创建的 UserBot
-  private tgUser: Telegram;
+  private tgUser?: Telegram;
   private qqClient: QQClient;
 
   constructor(private readonly instance: Instance,
@@ -103,25 +103,34 @@ export default class SetupController {
       await this.tryConnectNapCat(wsUrl);
     }
     // 登录 tg UserBot
-    if (this.instance.userSessionId) {
-      await this.setupService.informOwner('userSessionId 已经存在，跳过');
-      this.tgUser = await Telegram.connect(this.instance.userSessionId);
+    if (env.DISABLE_TG_USERBOT) {
+      await this.setupService.informOwner('UserBot 已通过环境变量禁用，跳过登录。之后需要启用时请移除 DISABLE_TG_USERBOT 并重启。');
+      return;
     }
-    else
+    if (this.instance.userSessionId) {
       try {
-        const phoneNumber = await this.setupService.waitForOwnerInput('创建 Telegram UserBot，请输入你的手机号码（需要带国家区号，例如：+86）');
-        await this.setupService.informOwner('正在登录，请稍候…');
-        this.tgUser = await this.setupService.createUserBot(phoneNumber);
-        this.instance.userSessionId = this.tgUser.sessionId;
-        await this.setupService.informOwner(`登录成功\n请使用下面的菜单开始创建转发！`);
+        await this.setupService.informOwner('正在连接已有 UserBot session');
+        this.tgUser = await Telegram.connect(this.instance.userSessionId);
+        await this.setupService.informOwner('UserBot 已连接');
+        return;
       }
       catch (e) {
-        this.log.error('创建 UserBot 失败', e);
-        posthog.capture('创建 UserBot 失败', { error: e });
-        await this.setupService.informOwner(`登录失败\n${e.message}`);
-        this.isInProgress = false;
-        throw e;
+        this.log.error('连接已有 UserBot 失败', e);
+        posthog.capture('连接已有 UserBot 失败', { error: e });
+        await this.setupService.informOwner('已有 UserBot session 连接失败，将生成新的扫码登录二维码。');
       }
+    }
+    try {
+      await this.setupService.informOwner('正在生成 UserBot 登录二维码，请用 Telegram 手机客户端扫码。');
+      this.tgUser = await this.setupService.createUserBotByQrCode();
+      this.instance.userSessionId = this.tgUser.sessionId;
+      await this.setupService.informOwner(`UserBot 登录成功\n请使用下面的菜单开始创建转发！`);
+    }
+    catch (e) {
+      this.log.error('创建 UserBot 失败，继续以 Bot 模式完成配置', e);
+      posthog.capture('创建 UserBot 失败', { error: e });
+      await this.setupService.informOwner(`UserBot 登录失败，已继续以 Bot 模式完成配置。\n之后可发送 /userbot_login 重新扫码登录。\n<code>${e.message}</code>`);
+    }
   }
 
   private async tryConnectNapCat(wsUrl: string) {
@@ -159,7 +168,7 @@ export default class SetupController {
   }
 
   public waitForFinish() {
-    return new Promise<{ tgUser: Telegram, qqClient: QQClient }>(resolve => {
+    return new Promise<{ tgUser?: Telegram, qqClient: QQClient }>(resolve => {
       this.waitForFinishCallbacks.push(resolve);
     });
   }

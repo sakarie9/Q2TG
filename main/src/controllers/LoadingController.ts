@@ -7,7 +7,7 @@ import lottie from '../constants/lottie';
 export default class {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              private readonly tgUser: Telegram | undefined,
               private readonly qqBot: QQClient) {
     this.initStickerPack();
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);

@@ -25,9 +25,9 @@ import AliveCheckController from '../controllers/AliveCheckController';
 import { QQClient } from '../client/QQClient';
 import posthog from './posthog';
 import LoadingController from '../controllers/LoadingController';
-import { sleep } from 'telegram/Helpers';
 import TypingController from '../controllers/TypingController';
 import GroupNameRefreshController from '../controllers/GroupNameRefreshController';
+import createUserBotByQrCode from '../helpers/userBotLogin';
 
 export default class Instance {
   public static readonly instances: Instance[] = [];
@@ -43,7 +43,7 @@ export default class Instance {
   private readonly log: Logger;
 
   public tgBot: Telegram;
-  public tgUser: Telegram;
+  public tgUser?: Telegram;
   public qqClient: QQClient;
   public isInit = false;
 
@@ -65,6 +65,7 @@ export default class Instance {
   private loadingController: LoadingController;
   private typingController: TypingController;
   private groupNameRefreshController: GroupNameRefreshController;
+  private userBotLoginPromise?: Promise<boolean>;
 
   private constructor(public readonly id: number) {
     this.log = getLogger(`Instance - ${this.id}`);
@@ -122,10 +123,8 @@ export default class Instance {
         this._ownerChat = await this.tgBot.getChat(this.owner);
       }
       else {
-        this.log.debug('正在登录 TG UserBot');
-        this.tgUser = await Telegram.connect(this._userSessionId);
-        this.log.info('TG UserBot 登录完成');
         this._ownerChat = await this.tgBot.getChat(this.owner);
+        await this.tryConnectUserBot();
         this.log.debug('正在连接 QQ 后端');
         if (this.qq.type !== 'napcat') {
           throw new Error('当前实例仍配置为已移除的旧 QQ 后端，请在数据库中改用 NapCat 后端后重试');
@@ -168,6 +167,78 @@ export default class Instance {
       this.loadingController.off();
     })()
       .then(() => this.log.info('初始化已完成'));
+  }
+
+  private async tryConnectUserBot() {
+    if (env.DISABLE_TG_USERBOT) {
+      this.log.warn('环境变量 DISABLE_TG_USERBOT 已启用，跳过 TG UserBot 登录');
+      await this.notifyOwner('UserBot 已通过环境变量禁用。需要启用时请移除 DISABLE_TG_USERBOT 并重启。');
+      return;
+    }
+    if (!this._userSessionId) {
+      this.log.warn('未配置 TG UserBot session，跳过 TG UserBot 登录');
+      await this.notifyOwner('UserBot 未登录，部分功能不可用。请发送 /userbot_login 扫码登录。');
+      return;
+    }
+    try {
+      this.log.debug('正在登录 TG UserBot');
+      this.tgUser = await Telegram.connect(this._userSessionId);
+      this.log.info('TG UserBot 登录完成');
+    }
+    catch (e) {
+      this.tgUser = undefined;
+      this.log.error('TG UserBot 登录失败，继续以 Bot 模式运行', e);
+      posthog.capture('TG UserBot 登录失败', { error: e });
+      await this.notifyOwner('UserBot 登录失败，程序已继续运行但部分功能不可用。请发送 /userbot_login 重新扫码登录。');
+    }
+  }
+
+  public async loginUserBotWithQrCode() {
+    if (this.userBotLoginPromise) {
+      await this.notifyOwner('UserBot 扫码登录流程已经在进行中，请扫描最近收到的二维码。');
+      return await this.userBotLoginPromise;
+    }
+    this.userBotLoginPromise = this.doLoginUserBotWithQrCode();
+    try {
+      return await this.userBotLoginPromise;
+    }
+    finally {
+      this.userBotLoginPromise = undefined;
+    }
+  }
+
+  private async doLoginUserBotWithQrCode() {
+    if (env.DISABLE_TG_USERBOT) {
+      await this.notifyOwner('UserBot 已通过环境变量禁用。需要启用时请移除 DISABLE_TG_USERBOT 并重启。');
+      return false;
+    }
+    if (!this.ownerChat) {
+      this._ownerChat = await this.tgBot.getChat(this.owner);
+    }
+    await this.notifyOwner('正在生成 UserBot 登录二维码，请在 Telegram 手机客户端中扫码。');
+    const tgUser = await createUserBotByQrCode(this.ownerChat, (err) => this.log.error(err));
+    if (this.tgUser) {
+      await this.tgUser.disconnect().catch(() => 0);
+    }
+    this.tgUser = tgUser;
+    this.userSessionId = tgUser.sessionId;
+    this.forwardPairs && await this.forwardPairs.reload(this.qqClient, this.tgBot, this.tgUser);
+    this.configController?.setUserBot(this.tgUser);
+    this.deleteMessageController?.setUserBot(this.tgUser);
+    this.forwardController?.setUserBot(this.tgUser);
+    await this.notifyOwner('UserBot 登录成功。');
+    return true;
+  }
+
+  private async notifyOwner(message: string) {
+    try {
+      if (!this.owner) return;
+      const ownerChat = this.ownerChat || await this.tgBot.getChat(this.owner);
+      await ownerChat.sendMessage({ message, linkPreview: false });
+    }
+    catch (e) {
+      this.log.warn('通知 Owner 失败', e);
+    }
   }
 
   public async login(botToken?: string) {
@@ -249,7 +320,7 @@ export default class Instance {
   }
 
   get userMe() {
-    return this.tgUser.me;
+    return this.tgUser?.me;
   }
 
   get ownerChat() {

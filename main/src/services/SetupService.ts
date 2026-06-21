@@ -6,6 +6,7 @@ import { Button } from 'telegram/tl/custom/button';
 import { WorkMode } from '../types/definitions';
 import TelegramChat from '../client/TelegramChat';
 import Instance from '../models/Instance';
+import createUserBotByQrCode from '../helpers/userBotLogin';
 
 export default class SetupService {
   private owner: TelegramChat;
@@ -59,24 +60,11 @@ export default class SetupService {
     return reply.message;
   }
 
-  public async createUserBot(phoneNumber: string) {
+  public async createUserBotByQrCode() {
     if (!this.owner) {
       throw new Error('应该不会运行到这里');
     }
-    return await Telegram.create({
-      phoneNumber,
-      password: async (hint?: string) => {
-        return await this.waitForOwnerInput(
-          `请输入你的二步验证密码${hint ? '\n密码提示：' + hint : ''}`, undefined, true);
-      },
-      phoneCode: async (isCodeViaApp?: boolean) => {
-        await this.informOwner(`请输入你${isCodeViaApp ? ' Telegram APP 中' : '手机上'}收到的验证码\n` +
-          '👇请使用下面的按钮输入，不要在文本框输入，<b>否则验证码会发不出去并立即失效</b>',
-          Button.text('👆请使用上面的按钮输入', true, true));
-        return await this.owner.inlineDigitInput();
-      },
-      onError: (err) => this.log.error(err),
-    });
+    return await createUserBotByQrCode(this.owner, (err) => this.log.error(err));
   }
 
   public async finishConfig() {

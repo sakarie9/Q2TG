@@ -20,6 +20,10 @@ const commonPrivateCommands = [
     command: 'alive',
     description: '状态信息',
   }),
+  new Api.BotCommand({
+    command: 'userbot_login',
+    description: '重新扫码登录 Telegram UserBot',
+  }),
 ]
 
 // 这里的 group 指群组模式，Private 指在与机器人的私聊会话中

@@ -21,6 +21,7 @@ const configParsed = z.object({
   TG_INITIAL_DCID: z.string().regex(/^\d+$/).transform(Number).optional(),
   TG_INITIAL_SERVER: z.string().ip().optional(),
   TG_USE_TEST_DC: z.string().transform((v) => ['true', '1', 'yes'].includes(v.toLowerCase())).default('false'),
+  DISABLE_TG_USERBOT: z.string().transform((v) => ['true', '1', 'yes'].includes(v.toLowerCase())).default('false'),
   IPV6: z.string().transform((v) => ['true', '1', 'yes'].includes(v.toLowerCase())).default('false'),
 
   PROXY_IP: z.string().ip().optional(),

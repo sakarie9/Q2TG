@@ -7,16 +7,23 @@ import { MessageRecallEvent, QQClient } from '../client/QQClient';
 
 export default class DeleteMessageController {
   private readonly deleteMessageService: DeleteMessageService;
+  private tgUser: Telegram | undefined;
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              tgUser: Telegram | undefined,
               private readonly qqClient: QQClient) {
     this.deleteMessageService = new DeleteMessageService(this.instance, tgBot);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
     tgBot.addEditedMessageEventHandler(this.onTelegramEditMessage);
-    tgUser.addDeletedMessageEventHandler(this.onTgDeletedMessage);
+    this.setUserBot(tgUser);
     qqClient.addMessageRecallEventHandler(this.onQqRecall);
+  }
+
+  public setUserBot(tgUser?: Telegram) {
+    if (!tgUser || this.tgUser === tgUser) return;
+    this.tgUser = tgUser;
+    tgUser.addDeletedMessageEventHandler(this.onTgDeletedMessage);
   }
 
   private onTelegramMessage = async (message: Api.Message) => {

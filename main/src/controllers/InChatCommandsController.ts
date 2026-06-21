@@ -14,7 +14,7 @@ export default class InChatCommandsController {
   constructor(
     private readonly instance: Instance,
     private readonly tgBot: Telegram,
-    private readonly tgUser: Telegram,
+    private readonly tgUser: Telegram | undefined,
     private readonly qqClient: QQClient,
   ) {
     this.log = getLogger(`InChatCommandsController - ${instance.id}`);

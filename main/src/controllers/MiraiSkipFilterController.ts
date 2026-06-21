@@ -5,7 +5,7 @@ import { MessageEvent, MiraiElem, QQClient } from '../client/QQClient';
 export default class {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              private readonly tgUser: Telegram | undefined,
               private readonly qqBot: QQClient) {
     qqBot.addNewMessageEventHandler(this.onQqMessage);
   }

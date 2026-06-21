@@ -1,5 +1,5 @@
 import { Api, TelegramClient } from 'telegram';
-import { BotAuthParams, UserAuthParams } from 'telegram/client/auth';
+import { BotAuthParams, QrCodeAuthParams, UserAuthParams } from 'telegram/client/auth';
 import { NewMessage, NewMessageEvent, Raw } from 'telegram/events';
 import { EditedMessage, EditedMessageEvent } from 'telegram/events/EditedMessage';
 import { DeletedMessage, DeletedMessageEvent } from 'telegram/events/DeletedMessage';
@@ -70,10 +70,34 @@ export default class Telegram {
 
   public static async create(startArgs: UserAuthParams | BotAuthParams, appName = 'Q2TG') {
     const bot = new this(appName);
-    await bot.client.start(startArgs);
-    this.existedBots[bot.sessionId] = bot;
-    await bot.config();
-    return bot;
+    try {
+      await bot.client.start(startArgs);
+      await bot.config();
+      this.existedBots[bot.sessionId] = bot;
+      return bot;
+    }
+    catch (e) {
+      await bot.disconnect().catch(() => 0);
+      throw e;
+    }
+  }
+
+  public static async createWithQrCode(startArgs: QrCodeAuthParams, appName = 'Q2TG') {
+    const bot = new this(appName);
+    try {
+      await bot.client.connect();
+      await bot.client.signInUserWithQrCode({
+        apiId: env.TG_API_ID,
+        apiHash: env.TG_API_HASH,
+      }, startArgs);
+      await bot.config();
+      this.existedBots[bot.sessionId] = bot;
+      return bot;
+    }
+    catch (e) {
+      await bot.disconnect().catch(() => 0);
+      throw e;
+    }
   }
 
   public static async connect(sessionId: number, appName = 'Q2TG') {
@@ -82,10 +106,21 @@ export default class Telegram {
       return this.existedBots[sessionId];
     }
     const bot = new this(appName, sessionId);
-    this.existedBots[sessionId] = bot;
-    await bot.client.connect();
-    await bot.config();
-    return bot;
+    try {
+      await bot.client.connect();
+      await bot.config();
+      this.existedBots[sessionId] = bot;
+      return bot;
+    }
+    catch (e) {
+      delete this.existedBots[sessionId];
+      await bot.disconnect().catch(() => 0);
+      throw e;
+    }
+  }
+
+  public async disconnect() {
+    await this.client.disconnect();
   }
 
   private async config() {

@@ -49,7 +49,7 @@ export default class ForwardPairs {
   }
 
   // 在 forwardController 创建时初始化
-  private async init(qqClient: QQClient, tgBot: Telegram, tgUser: Telegram) {
+  private async init(qqClient: QQClient, tgBot: Telegram, tgUser?: Telegram) {
     const dbValues = await db.forwardPair.findMany({
       where: { instanceId: this.instanceId },
     });
@@ -57,16 +57,17 @@ export default class ForwardPairs {
       try {
         const qq = await qqClient.getChat(Number(i.qqRoomId), i.qqFromGroupId ? Number(i.qqFromGroupId) : undefined);
         const tg = await this.getTelegramChat(tgBot, Number(i.tgChatId));
-        let tgUserChat: TelegramChat;
-        try {
-          tgUserChat = await this.getTelegramChat(tgUser, Number(i.tgChatId));
-        }
-        catch (e) {
-          this.log.warn(
-            `UserBot 无法解析 TG: ${i.tgChatId}，使用 Bot 会话兜底；部分 UserBot 相关功能可能不可用`,
-            this.formatError(e),
-          );
-          tgUserChat = tg;
+        let tgUserChat = tg;
+        if (tgUser) {
+          try {
+            tgUserChat = await this.getTelegramChat(tgUser, Number(i.tgChatId));
+          }
+          catch (e) {
+            this.log.warn(
+              `UserBot 无法解析 TG: ${i.tgChatId}，使用 Bot 会话兜底；部分 UserBot 相关功能可能不可用`,
+              this.formatError(e),
+            );
+          }
         }
         if (qq && tg && tgUserChat) {
           this.log.debug('初始化', { qq, tg, tgUserChat });
@@ -80,7 +81,7 @@ export default class ForwardPairs {
     this.log.info(`初始化完成，加载 ${this.pairs.length}/${dbValues.length} 个关联`);
   }
 
-  public static async load(instanceId: number, qqClient: QQClient, tgBot: Telegram, tgUser: Telegram) {
+  public static async load(instanceId: number, qqClient: QQClient, tgBot: Telegram, tgUser?: Telegram) {
     const instance = new this(instanceId);
     await instance.init(qqClient, tgBot, tgUser);
     return instance;
@@ -97,6 +98,11 @@ export default class ForwardPairs {
     });
     this.pairs.push(new Pair(qq, tg, tgUser, dbEntry.id, dbEntry.flags, dbEntry.apiKey, qqClient));
     return dbEntry;
+  }
+
+  public async reload(qqClient: QQClient, tgBot: Telegram, tgUser?: Telegram) {
+    this.pairs = [];
+    await this.init(qqClient, tgBot, tgUser);
   }
 
   public async remove(pair: Pair) {

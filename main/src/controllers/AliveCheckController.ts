@@ -6,7 +6,7 @@ import { QQClient } from '../client/QQClient';
 export default class AliveCheckController {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              private readonly tgUser: Telegram | undefined,
               private readonly qqClient: QQClient) {
     tgBot.addNewMessageEventHandler(this.handleMessage);
   }
@@ -36,8 +36,10 @@ export default class AliveCheckController {
       const tgBot = instance.tgBot;
       const tgUser = instance.tgUser;
 
-      const tgUserName = (tgUser.me.username || tgUser.me.usernames.length) ?
-        '@' + (tgUser.me.username || tgUser.me.usernames[0].username) : tgUser.me.firstName;
+      const tgUserName = tgUser ?
+        ((tgUser.me.username || tgUser.me.usernames.length) ?
+          '@' + (tgUser.me.username || tgUser.me.usernames[0].username) : tgUser.me.firstName) :
+        '未登录';
       messageParts.push([
         `Instance #${instance.id} (${instance.workMode}) ${instance.isInit ? '' : '初始化未完成'}`,
 
@@ -46,7 +48,7 @@ export default class AliveCheckController {
 
         `TG @${tgBot.me.username}\t${boolToStr(tgBot.isOnline)}`,
 
-        `TG User ${tgUserName}\t${boolToStr(tgBot.isOnline)}`,
+        `TG User ${tgUserName}\t${boolToStr(!!tgUser?.isOnline)}`,
       ].join('\n'));
     }
 

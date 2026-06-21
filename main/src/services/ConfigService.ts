@@ -21,10 +21,22 @@ export default class ConfigService {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly tgUser: Telegram,
+              private tgUser: Telegram | undefined,
               private readonly qqClient: QQClient) {
     this.log = getLogger(`ConfigService - ${instance.id}`);
     this.owner = tgBot.getChat(this.instance.owner);
+  }
+
+  public setUserBot(tgUser?: Telegram) {
+    this.tgUser = tgUser;
+  }
+
+  private async requireUserBot() {
+    if (!this.tgUser) {
+      await (await this.owner).sendMessage('UserBot 未登录，无法执行此操作。请发送 /userbot_login 扫码登录。');
+      throw new Error('TG UserBot 未登录');
+    }
+    return this.tgUser;
   }
 
   private getAssociateLink(roomId: number) {
@@ -147,8 +159,9 @@ export default class ConfigService {
       }
 
       if (!chat) {
+        const tgUser = await this.requireUserBot();
         // 创建群聊，拿到的是 user 的 chat
-        chat = await this.tgUser.createChat(title, await getAboutText(room, false));
+        chat = await tgUser.createChat(title, await getAboutText(room, false));
 
         // 添加机器人
         status && await status.edit({ text: '正在添加机器人…' });
@@ -162,11 +175,12 @@ export default class ConfigService {
       // 添加到 Filter
       try {
         status && await status.edit({ text: '正在将群添加到文件夹…' });
-        const dialogFilters = await this.tgUser.getDialogFilters();
+        const tgUser = await this.requireUserBot();
+        const dialogFilters = await tgUser.getDialogFilters();
         const filter = dialogFilters.filters.find(e => e instanceof Api.DialogFilter && e.id === DEFAULT_FILTER_ID) as Api.DialogFilter;
         if (filter) {
           filter.includePeers.push(utils.getInputPeer(chat));
-          await this.tgUser.updateDialogFilter({
+          await tgUser.updateDialogFilter({
             id: DEFAULT_FILTER_ID,
             filter,
           });
@@ -246,7 +260,7 @@ export default class ConfigService {
       try {
         const qGroup = await this.qqClient.getChat(qqRoomId) as Group;
         const tgChat = await this.tgBot.getChat(tgChatId);
-        const tgUserChat = await this.tgUser.getChat(tgChatId);
+        const tgUserChat = this.tgUser ? await this.tgUser.getChat(tgChatId) : tgChat;
         await this.instance.forwardPairs.add(qGroup, tgChat, tgUserChat, this.qqClient);
         await tgChat.sendMessage(`QQ群：${qGroup.name} (<code>${qGroup.gid}</code>)已与 ` +
           `Telegram 群 ${(tgChat.entity as Api.Channel).title} (<code>${tgChatId}</code>)关联`);
@@ -265,14 +279,16 @@ export default class ConfigService {
       }
     }
     else {
-      const chat = await this.tgUser.getChat(tgChatId);
+      const tgUser = await this.requireUserBot();
+      const chat = await tgUser.getChat(tgChatId);
       await this.createGroupAndLink(qqRoomId, undefined, true, chat);
     }
   }
 
   // 创建 QQ 群组的文件夹
   public async setupFilter() {
-    const result = await this.tgUser.getDialogFilters();
+    const tgUser = await this.requireUserBot();
+    const result = await tgUser.getDialogFilters();
     let filter = result.filters.find(e => e instanceof Api.DialogFilter && e.id === DEFAULT_FILTER_ID);
     if (!filter) {
       this.log.info('创建 TG 文件夹');
@@ -283,7 +299,7 @@ export default class ConfigService {
         id: DEFAULT_FILTER_ID,
         title: 'QQ',
         pinnedPeers: [
-          (await this.tgUser.getChat(this.tgBot.me.username)).inputPeer,
+          (await tgUser.getChat(this.tgBot.me.username)).inputPeer,
         ],
         includePeers: [],
         excludePeers: [],
@@ -291,7 +307,7 @@ export default class ConfigService {
       });
       let errorText = '设置文件夹失败';
       try {
-        const isSuccess = await this.tgUser.updateDialogFilter({
+        const isSuccess = await tgUser.updateDialogFilter({
           id: DEFAULT_FILTER_ID,
           filter,
         });
@@ -309,9 +325,10 @@ export default class ConfigService {
   }
 
   public async migrateAllChats() {
+    const tgUser = await this.requireUserBot();
     const dbPairs = await db.forwardPair.findMany();
     for (const forwardPair of dbPairs) {
-      const chatForUser = await this.tgUser.getChat(Number(forwardPair.tgChatId));
+      const chatForUser = await tgUser.getChat(Number(forwardPair.tgChatId));
       if (chatForUser.entity instanceof Api.Chat) {
         this.log.info('升级群组 ', chatForUser.id);
         await chatForUser.migrate();
