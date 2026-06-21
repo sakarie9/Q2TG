@@ -19,9 +19,9 @@ export default class {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`QuotLyController - ${instance.id}`);
-    oicq.addNewMessageEventHandler(this.onQqMessage);
+    qqClient.addNewMessageEventHandler(this.onQqMessage);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
   }
 
@@ -328,7 +328,7 @@ export default class {
     await db.message.create({
       data: {
         qqRoomId: pair.qqRoomId,
-        qqSenderId: this.oicq.uin,
+        qqSenderId: this.qqClient.uin,
         time: qqMessage.time,
         brief: '[Quote]',
         seq: qqMessage.seq,

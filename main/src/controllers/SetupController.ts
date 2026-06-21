@@ -6,7 +6,6 @@ import { Button } from 'telegram/tl/custom/button';
 import setupHelper from '../helpers/setupHelper';
 import commands from '../constants/commands';
 import { WorkMode } from '../types/definitions';
-import { md5Hex } from '../utils/hashing';
 import Instance from '../models/Instance';
 import env from '../models/env';
 import { QQClient } from '../client/QQClient';
@@ -17,10 +16,10 @@ export default class SetupController {
   private readonly setupService: SetupService;
   private readonly log: Logger;
   private isInProgress = false;
-  private waitForFinishCallbacks: Array<(ret: { tgUser: Telegram, oicq: QQClient }) => unknown> = [];
+  private waitForFinishCallbacks: Array<(ret: { tgUser: Telegram, qqClient: QQClient }) => unknown> = [];
   // 创建的 UserBot
   private tgUser: Telegram;
-  private oicq: QQClient;
+  private qqClient: QQClient;
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram) {
@@ -75,26 +74,15 @@ export default class SetupController {
       this.isInProgress = false;
       throw e;
     }
-    // 登录 oicq
+    // 连接 QQ 后端
     if (this.instance.qq) {
-      await this.setupService.informOwner('正在登录已设置好的 QQ');
-      this.oicq = await QQClient.create({
-        type: this.instance.qq.type,
+      if (this.instance.qq.type !== 'napcat') {
+        throw new Error('当前实例仍配置为已移除的旧 QQ 后端，请在数据库中改用 NapCat 后端后重试');
+      }
+      await this.setupService.informOwner('正在连接已设置好的 NapCat');
+      this.qqClient = await QQClient.create({
+        type: 'napcat',
         id: this.instance.qq.id,
-        uin: Number(this.instance.qq.uin),
-        password: this.instance.qq.password,
-        platform: this.instance.qq.platform,
-        signApi: this.instance.qq.signApi,
-        signVer: this.instance.qq.signVer,
-        signDockerId: this.instance.qq.signDockerId,
-        onVerifyDevice: async (phone) => {
-          return await this.setupService.waitForOwnerInput(`请输入手机 ${phone} 收到的验证码`);
-        },
-        onVerifySlider: async (url) => {
-          return await this.setupService.waitForOwnerInput(`收到滑块验证码 <code>${url}</code>\n` +
-            '请使用<a href="https://github.com/mzdluo123/TxCaptchaHelper/releases">此软件</a>验证并输入 Ticket',
-          );
-        },
         wsUrl: this.instance.qq.wsUrl,
       });
     }
@@ -102,61 +90,17 @@ export default class SetupController {
       await this.tryConnectNapCat(env.NAPCAT_WS_URL);
     }
     else {
-      let uin = NaN, wsUrl = '';
-      while (isNaN(uin) && !wsUrl) {
-        const input = await this.setupService.waitForOwnerInput('请输入要登录 QQ 号');
-        uin = Number(input);
+      let wsUrl = '';
+      while (!wsUrl) {
+        const input = await this.setupService.waitForOwnerInput('请输入 NapCat WebSocket 地址，例如 ws://napcat:3001');
         if (/wss?:\/\//.test(input)) {
           wsUrl = input;
         }
+        else {
+          await this.setupService.informOwner('地址格式不正确，请输入 ws:// 或 wss:// 开头的 NapCat WebSocket 地址');
+        }
       }
-      if (uin)
-        try {
-          const platformText = await this.setupService.waitForOwnerInput('请选择登录协议', [
-            [Button.text('安卓手机', true, true)],
-            [Button.text('安卓平板', true, true)],
-            [Button.text('iPad', true, true)],
-          ]);
-          const platform = setupHelper.convertTextToPlatform(platformText);
-
-          let signApi: string;
-
-          if (!env.SIGN_API) {
-            signApi = await this.setupService.waitForOwnerInput('请输入签名服务器地址', [
-              [Button.text('不需要签名服务器', true, true)],
-            ]);
-            signApi = setupHelper.checkSignApiAddress(signApi);
-          }
-
-          let signVer: string;
-
-          if (signApi && !env.SIGN_VER) {
-            signVer = await this.setupService.waitForOwnerInput('请输入签名服务器版本', [
-              [Button.text('8.9.63', true, true),
-                Button.text('8.9.68', true, true)],
-              [Button.text('8.9.70', true, true),
-                Button.text('8.9.71', true, true),
-                Button.text('8.9.73', true, true)],
-              [Button.text('8.9.78', true, true),
-                Button.text('8.9.83', true, true)],
-            ]);
-          }
-
-          let password = await this.setupService.waitForOwnerInput('请输入密码', undefined, true);
-          password = md5Hex(password);
-          this.oicq = await this.setupService.createOicq(uin, password, platform, signApi, signVer);
-          this.instance.qqBotId = this.oicq.id;
-          await this.setupService.informOwner(`登录成功`);
-        }
-        catch (e) {
-          this.log.error('登录 OICQ 失败', e);
-          posthog.capture('登录 OICQ 失败', { error: e });
-          await this.setupService.informOwner(`登录失败\n${e.message}`);
-          this.isInProgress = false;
-          throw e;
-        }
-      else
-        await this.tryConnectNapCat(wsUrl);
+      await this.tryConnectNapCat(wsUrl);
     }
     // 登录 tg UserBot
     if (this.instance.userSessionId) {
@@ -188,7 +132,7 @@ export default class SetupController {
           wsUrl,
         },
       });
-      this.oicq = await QQClient.create({
+      this.qqClient = await QQClient.create({
         ...dbQQBot,
         type: 'napcat',
       });
@@ -210,12 +154,12 @@ export default class SetupController {
     await this.setupService.finishConfig();
     this.waitForFinishCallbacks.forEach(e => e({
       tgUser: this.tgUser,
-      oicq: this.oicq,
+      qqClient: this.qqClient,
     }));
   }
 
   public waitForFinish() {
-    return new Promise<{ tgUser: Telegram, oicq: QQClient }>(resolve => {
+    return new Promise<{ tgUser: Telegram, qqClient: QQClient }>(resolve => {
       this.waitForFinishCallbacks.push(resolve);
     });
   }

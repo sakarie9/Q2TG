@@ -1,7 +1,6 @@
 import Instance from '../models/Instance';
 import Telegram from '../client/Telegram';
-import { MiraiElem } from '@icqqjs/icqq';
-import { MessageEvent, QQClient } from '../client/QQClient';
+import { MessageEvent, MiraiElem, QQClient } from '../client/QQClient';
 
 export default class {
   constructor(private readonly instance: Instance,

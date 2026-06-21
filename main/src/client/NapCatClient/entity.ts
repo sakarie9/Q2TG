@@ -1,5 +1,4 @@
-import { MessageRet, Quotable } from '@icqqjs/icqq';
-import { Friend, Group, GroupFs, GroupMember, QQEntity, QQUser, Sendable, SendableElem } from '../QQClient';
+import { Friend, Group, GroupFs, GroupMember, MessageRet, QQEntity, QQUser, Quotable, Sendable, SendableElem } from '../QQClient';
 import { NapCatClient } from './client';
 import { messageElemToNapCatSendable, napCatForwardMultiple, napCatReceiveToMessageElem } from './convert';
 import { getLogger, Logger } from 'log4js';
@@ -321,5 +320,21 @@ export class NapCatGroupMember extends NapCatUser implements GroupMember {
       group_id: this.gid,
       user_id: this.uin,
     });
+  }
+
+  async getProfile() {
+    const user = await this.client.pickFriend(this.uin) as NapCatFriend;
+    const info = await user.renew();
+    return {
+      birthday: [(info as any).birthday_year, (info as any).birthday_month, (info as any).birthday_day],
+      email: (info as any).eMail,
+      nickname: info.nickname,
+      city: (info as any).city || (info as any).detail?.commonExt?.city,
+      QID: (info as any).qid,
+      country: (info as any).country || (info as any).detail?.commonExt?.country || '',
+      province: (info as any).province || (info as any).detail?.commonExt?.province || '',
+      signature: '',
+      regTimestamp: (info as any).regTime || (info as any).detail?.commonExt?.regTime || '',
+    };
   }
 }

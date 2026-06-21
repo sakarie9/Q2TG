@@ -1,7 +1,7 @@
 import { getLogger, Logger } from 'log4js';
 import Instance from '../models/Instance';
 import Telegram from '../client/Telegram';
-import { FriendRequestEvent, GroupInviteEvent } from '@icqqjs/icqq';
+import { FriendRequestEvent, GroupInviteEvent } from '../client/QQClient';
 import { getAvatar } from '../utils/urls';
 import { CustomFile } from 'telegram/client/uploads';
 import { Button } from 'telegram/tl/custom/button';
@@ -13,10 +13,10 @@ export default class RequestController {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`RequestController - ${instance.id}`);
-    oicq.addFriendRequestEventHandler(this.handleRequest);
-    oicq.addGroupInviteEventHandler(this.handleRequest);
+    qqClient.addFriendRequestEventHandler(this.handleRequest);
+    qqClient.addGroupInviteEventHandler(this.handleRequest);
   }
 
   private handleRequest = async (event: FriendRequestEvent | GroupInviteEvent) => {

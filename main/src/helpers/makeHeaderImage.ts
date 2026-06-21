@@ -1,4 +1,4 @@
-import { GroupRole } from '@icqqjs/icqq/lib/common';
+import { GroupRole } from '../client/QQClient';
 import { createCanvas, loadImage, CanvasRenderingContext2D } from 'canvas';
 import * as fs from 'fs';
 
@@ -109,4 +109,3 @@ export default makeHeaderImage;
 //     })
 //     .catch(console.log);
 // })();
-

@@ -14,7 +14,6 @@ import {
   QQClient,
 } from '../client/QQClient';
 import { MessageEvent } from '../client/QQClient';
-import OicqClient from '../client/OicqClient';
 
 export default class ConfigController {
   private readonly configService: ConfigService;
@@ -24,16 +23,16 @@ export default class ConfigController {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
               private readonly tgUser: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`ConfigController - ${instance.id}`);
-    this.configService = new ConfigService(this.instance, tgBot, tgUser, oicq);
+    this.configService = new ConfigService(this.instance, tgBot, tgUser, qqClient);
     tgBot.addNewMessageEventHandler(this.handleMessage);
     tgBot.addNewServiceMessageEventHandler(this.handleServiceMessage);
     tgBot.addChannelParticipantEventHandler(this.handleChannelParticipant);
-    oicq.addNewMessageEventHandler(this.handleQqMessage);
-    oicq.addGroupMemberDecreaseEventHandler(this.handleGroupDecrease);
-    this.instance.workMode === 'personal' && oicq.addGroupMemberIncreaseEventHandler(this.handleMemberIncrease);
-    this.instance.workMode === 'personal' && oicq.addFriendIncreaseEventHandler(this.handleFriendIncrease);
+    qqClient.addNewMessageEventHandler(this.handleQqMessage);
+    qqClient.addGroupMemberDecreaseEventHandler(this.handleGroupDecrease);
+    this.instance.workMode === 'personal' && qqClient.addGroupMemberIncreaseEventHandler(this.handleMemberIncrease);
+    this.instance.workMode === 'personal' && qqClient.addFriendIncreaseEventHandler(this.handleFriendIncrease);
     this.instance.workMode === 'personal' && this.configService.setupFilter();
   }
 
@@ -72,9 +71,7 @@ export default class ConfigController {
             await this.configService.migrateAllChats();
             return true;
           case '/login':
-            if (this.oicq instanceof OicqClient) {
-              await this.oicq.oicq.login();
-            }
+            await this.qqClient.login();
             return true;
           case '/refresh_all':
             await this.configService.refreshAll();
@@ -134,7 +131,7 @@ export default class ConfigController {
       return false;
     }
     // 有未创建转发群的新私聊消息时自动创建
-    const refChat = await this.oicq.getChat(chat.uin) as Friend; // 重新获取一次，以获取备注
+    const refChat = await this.qqClient.getChat(chat.uin) as Friend; // 重新获取一次，以获取备注
     promise = this.configService.createGroupAndLink(refChat, undefined, true, undefined, message.tempChatFromGroupId);
     this.createPrivateMessageGroupBlockList.set(chat.uin, promise);
     await promise;
@@ -142,7 +139,7 @@ export default class ConfigController {
   };
 
   private handleMemberIncrease = async (event: GroupMemberIncreaseEvent) => {
-    if (event.userId !== this.oicq.uin || this.instance.forwardPairs.find(event.chat)) return;
+    if (event.userId !== this.qqClient.uin || this.instance.forwardPairs.find(event.chat)) return;
     // 是新群并且是自己加入了
     await this.configService.promptNewQqChat(event.chat);
   };
@@ -168,7 +165,7 @@ export default class ConfigController {
   private handleGroupDecrease = async (event: GroupMemberDecreaseEvent) => {
     // 如果是自己被踢出群，则删除对应的配置
     // 如果是群主解散群，则删除对应的配置
-    if (event.userId !== this.oicq.uin) return;
+    if (event.userId !== this.qqClient.uin) return;
     const pair = this.instance.forwardPairs.find(event.chat);
     if (!pair) return;
     await this.instance.forwardPairs.remove(pair);

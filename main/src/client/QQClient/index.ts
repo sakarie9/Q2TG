@@ -1,14 +1,21 @@
-import { CreateOicqParams } from '../OicqClient';
-import { Friend, Group, SendableElem } from './entity';
+import {
+  Friend,
+  FriendRequestEvent,
+  Group,
+  GroupInviteEvent,
+  ImageElem,
+  SendableElem,
+} from './entity';
 import {
   FriendIncreaseEvent,
   GroupMemberDecreaseEvent,
-  GroupMemberIncreaseEvent, GroupNameChangeEvent, InputStatusChangeEvent,
+  GroupMemberIncreaseEvent,
+  GroupNameChangeEvent,
+  InputStatusChangeEvent,
   MessageEvent,
-  MessageRecallEvent, PokeEvent,
+  MessageRecallEvent,
+  PokeEvent,
 } from './events';
-import type { FriendRequestEvent, GroupInviteEvent, ImageElem } from '@icqqjs/icqq';
-import { CreateNapCatParams } from '../NapCatClient';
 
 export * from './events';
 export * from './entity';
@@ -17,7 +24,12 @@ export interface CreateQQClientParamsBase {
   id: number;
 }
 
-export type CreateQQClientParams = CreateOicqParams | CreateNapCatParams;
+export interface CreateNapCatParams extends CreateQQClientParamsBase {
+  type: 'napcat';
+  wsUrl: string;
+}
+
+export type CreateQQClientParams = CreateNapCatParams;
 
 export abstract class QQClient {
   protected constructor(
@@ -26,11 +38,11 @@ export abstract class QQClient {
   ) {
   }
 
+  public abstract readonly kind: 'napcat';
   public abstract uin: number;
   public abstract nickname: string;
 
   public abstract isOnline(): Promise<boolean>;
-
 
   private static existedBots = {} as { [id: number]: Promise<QQClient> };
 
@@ -39,28 +51,13 @@ export abstract class QQClient {
       return this.existedBots[params.id];
     }
 
-    let client: Promise<QQClient>;
-    let clientType: {
-      create(params: CreateQQClientParams): Promise<QQClient>;
+    const clientType = require('../NapCatClient/client').NapCatClient as {
+      create(params: CreateNapCatParams): Promise<QQClient>;
     };
-
-    switch (params.type) {
-      case 'oicq':
-        clientType = require('../OicqClient').default;
-        break;
-      case 'napcat':
-        clientType = require('../NapCatClient').NapCatClient;
-        break;
-      default:
-        throw new Error('Unknown client type');
-    }
-
-    client = clientType.create(params);
-
+    const client = clientType.create(params);
     this.existedBots[params.id] = client;
     return client;
   }
-
 
   public abstract getFriendsWithCluster(): Promise<{
     name: string;
@@ -68,7 +65,6 @@ export abstract class QQClient {
   }[]>;
 
   public abstract getGroupList(): Promise<Group[]>;
-
 
   protected async callHandlers<T>(handlers: Array<(e: T) => Promise<void | boolean>>, e: T) {
     for (const handler of handlers) {
@@ -88,7 +84,6 @@ export abstract class QQClient {
     this.onMessageHandlers.splice(this.onMessageHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onGroupMemberIncreaseHandlers: Array<(e: GroupMemberIncreaseEvent) => Promise<void | boolean>> = [];
 
   public addGroupMemberIncreaseEventHandler(handler: (e: GroupMemberIncreaseEvent) => Promise<void | boolean>) {
@@ -100,7 +95,6 @@ export abstract class QQClient {
     this.onGroupMemberIncreaseHandlers.splice(this.onGroupMemberIncreaseHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onGroupMemberDecreaseHandlers: Array<(e: GroupMemberDecreaseEvent) => Promise<void | boolean>> = [];
 
   public addGroupMemberDecreaseEventHandler(handler: (e: GroupMemberDecreaseEvent) => Promise<void | boolean>) {
@@ -112,7 +106,6 @@ export abstract class QQClient {
     this.onGroupMemberDecreaseHandlers.splice(this.onGroupMemberDecreaseHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onFriendIncreaseHandlers: Array<(e: FriendIncreaseEvent) => Promise<void | boolean>> = [];
 
   public addFriendIncreaseEventHandler(handler: (e: FriendIncreaseEvent) => Promise<void | boolean>) {
@@ -124,7 +117,6 @@ export abstract class QQClient {
     this.onFriendIncreaseHandlers.splice(this.onFriendIncreaseHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onMessageRecallHandlers: Array<(e: MessageRecallEvent) => Promise<void | boolean>> = [];
 
   public addMessageRecallEventHandler(handler: (e: MessageRecallEvent) => Promise<void | boolean>) {
@@ -136,7 +128,6 @@ export abstract class QQClient {
     this.onMessageRecallHandlers.splice(this.onMessageRecallHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onPokeHandlers: Array<(e: PokeEvent) => Promise<void | boolean>> = [];
 
   public addPokeEventHandler(handler: (e: PokeEvent) => Promise<void | boolean>) {
@@ -148,7 +139,6 @@ export abstract class QQClient {
     this.onPokeHandlers.splice(this.onPokeHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onFriendRequestHandlers: Array<(e: FriendRequestEvent) => Promise<void | boolean>> = [];
 
   public addFriendRequestEventHandler(handler: (e: FriendRequestEvent) => Promise<void | boolean>) {
@@ -160,7 +150,6 @@ export abstract class QQClient {
     this.onFriendRequestHandlers.splice(this.onFriendRequestHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onGroupInviteHandlers: Array<(e: GroupInviteEvent) => Promise<void | boolean>> = [];
 
   public addGroupInviteEventHandler(handler: (e: GroupInviteEvent) => Promise<void | boolean>) {
@@ -172,7 +161,6 @@ export abstract class QQClient {
     this.onGroupInviteHandlers.splice(this.onGroupInviteHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onInputStatusChangeHandlers: Array<(e: InputStatusChangeEvent) => Promise<void | boolean>> = [];
 
   public addInputStatusChangeHandler(handler: (e: InputStatusChangeEvent) => Promise<void | boolean>) {
@@ -184,7 +172,6 @@ export abstract class QQClient {
     this.onInputStatusChangeHandlers.splice(this.onInputStatusChangeHandlers.indexOf(handler), 1);
   }
 
-  //
   protected readonly onGroupNameChangeHandlers: Array<(e: GroupNameChangeEvent) => Promise<void | boolean>> = [];
 
   public addGroupNameChangeHandler(handler: (e: GroupNameChangeEvent) => Promise<void | boolean>) {
@@ -195,8 +182,6 @@ export abstract class QQClient {
     this.onGroupNameChangeHandlers.includes(handler) &&
     this.onGroupNameChangeHandlers.splice(this.onGroupNameChangeHandlers.indexOf(handler), 1);
   }
-
-  // End Handlers
 
   public getChat(roomId: number, tempChatFromGroupId?: number): Promise<Group | Friend> {
     if (roomId > 0) {
@@ -226,5 +211,9 @@ export abstract class QQClient {
       });
     }
     return res;
+  }
+
+  public async login(): Promise<void> {
+    throw new Error('当前 QQ 后端不支持重新登录');
   }
 }

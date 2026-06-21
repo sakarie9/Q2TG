@@ -12,7 +12,6 @@ import getAboutText from '../utils/getAboutText';
 import random from '../utils/random';
 import { Friend, Group, QQClient } from '../client/QQClient';
 import posthog from '../models/posthog';
-import OicqClient from '../client/OicqClient';
 
 const DEFAULT_FILTER_ID = 114; // 514
 
@@ -23,7 +22,7 @@ export default class ConfigService {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
               private readonly tgUser: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`ConfigService - ${instance.id}`);
     this.owner = tgBot.getChat(this.instance.owner);
   }
@@ -36,7 +35,7 @@ export default class ConfigService {
 
   // 开始添加转发群组流程
   public async addGroup() {
-    const qGroups = (await this.oicq.getGroupList())
+    const qGroups = (await this.qqClient.getGroupList())
       .filter(it => !this.instance.forwardPairs.find(-it.gid));
     const buttons = qGroups.map(e =>
       this.instance.workMode === 'personal' ?
@@ -54,7 +53,7 @@ export default class ConfigService {
 
   // 只可能是 personal 运行模式
   public async addFriend() {
-    const friends = await this.oicq.getFriendsWithCluster();
+    const friends = await this.qqClient.getFriendsWithCluster();
     await (await this.owner).createPaginatedInlineSelector('选择分组', friends.map(e => [
       Button.inline(e.name || '(未知名称)', this.tgBot.registerCallback(
         () => this.openFriendSelection(e.friends, e.name),
@@ -90,7 +89,7 @@ export default class ConfigService {
   }
 
   public async addExact(gin: number) {
-    const group = await this.oicq.pickGroup(gin);
+    const group = await this.qqClient.pickGroup(gin);
     let avatar: Buffer;
     try {
       avatar = await getAvatar(-group.gid);
@@ -120,7 +119,7 @@ export default class ConfigService {
   public async createGroupAndLink(room: number | Friend | Group, title?: string, status: boolean | Api.Message = true, chat?: TelegramChat, qqFromGroupId?: number) {
     this.log.info(`创建群组并关联：${room}`);
     if (typeof room === 'number') {
-      room = await this.oicq.getChat(room, qqFromGroupId);
+      room = await this.qqClient.getChat(room, qqFromGroupId);
     }
     if (!title) {
       // TS 这边不太智能
@@ -130,11 +129,6 @@ export default class ConfigService {
       else {
         title = room.name;
       }
-    }
-    if (!title && this.oicq instanceof OicqClient && 'uin' in room && qqFromGroupId) {
-      // 可能是群临时
-      const info = await this.oicq.oicq.getGroupMemberInfo(qqFromGroupId, room.uin);
-      title = info.card || info.nickname;
     }
     let isFinish = false;
     try {
@@ -196,8 +190,8 @@ export default class ConfigService {
       // 关联写入数据库
       const chatForBot = await this.tgBot.getChat(chat.id);
       status && await status.edit({ text: '正在写数据库…' });
-      this.log.debug('正在写数据库:', room, chatForBot, chat, this.oicq, qqFromGroupId);
-      const dbPair = await this.instance.forwardPairs.add(room, chatForBot, chat, this.oicq, qqFromGroupId);
+      this.log.debug('正在写数据库:', room, chatForBot, chat, this.qqClient, qqFromGroupId);
+      const dbPair = await this.instance.forwardPairs.add(room, chatForBot, chat, this.qqClient, qqFromGroupId);
       isFinish = true;
 
       // 更新头像
@@ -250,10 +244,10 @@ export default class ConfigService {
   public async createLinkGroup(qqRoomId: number, tgChatId: number) {
     if (this.instance.workMode === 'group') {
       try {
-        const qGroup = await this.oicq.getChat(qqRoomId) as Group;
+        const qGroup = await this.qqClient.getChat(qqRoomId) as Group;
         const tgChat = await this.tgBot.getChat(tgChatId);
         const tgUserChat = await this.tgUser.getChat(tgChatId);
-        await this.instance.forwardPairs.add(qGroup, tgChat, tgUserChat, this.oicq);
+        await this.instance.forwardPairs.add(qGroup, tgChat, tgUserChat, this.qqClient);
         await tgChat.sendMessage(`QQ群：${qGroup.name} (<code>${qGroup.gid}</code>)已与 ` +
           `Telegram 群 ${(tgChat.entity as Api.Channel).title} (<code>${tgChatId}</code>)关联`);
         if (!(tgChat.entity instanceof Api.Channel)) {

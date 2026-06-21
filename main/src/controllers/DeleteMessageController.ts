@@ -11,12 +11,12 @@ export default class DeleteMessageController {
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
               private readonly tgUser: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.deleteMessageService = new DeleteMessageService(this.instance, tgBot);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
     tgBot.addEditedMessageEventHandler(this.onTelegramEditMessage);
     tgUser.addDeletedMessageEventHandler(this.onTgDeletedMessage);
-    oicq.addMessageRecallEventHandler(this.onQqRecall);
+    qqClient.addMessageRecallEventHandler(this.onQqRecall);
   }
 
   private onTelegramMessage = async (message: Api.Message) => {

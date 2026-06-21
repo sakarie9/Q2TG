@@ -1,6 +1,5 @@
 import Instance from '../models/Instance';
 import Telegram from '../client/Telegram';
-import { AtElem } from '@icqqjs/icqq';
 import { Pair } from '../models/Pair';
 import { Api } from 'telegram';
 import db from '../models/db';
@@ -8,8 +7,7 @@ import BigInteger from 'big-integer';
 import helper from '../helpers/forwardHelper';
 import { getLogger, Logger } from 'log4js';
 import flags from '../constants/flags';
-import { MessageEvent, QQClient, Group, GroupMemberInfo, Sendable } from '../client/QQClient';
-import { Member as OicqMember } from '@icqqjs/icqq/lib/member';
+import { AtElem, MessageEvent, QQClient, Group, Sendable } from '../client/QQClient';
 import env from '../models/env';
 import forwardHelper from '../helpers/forwardHelper';
 
@@ -34,9 +32,9 @@ export default class {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`HugController - ${instance.id}`);
-    oicq.addNewMessageEventHandler(this.onQqMessage);
+    qqClient.addNewMessageEventHandler(this.onQqMessage);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
   }
 
@@ -71,7 +69,7 @@ export default class {
         id: ats[0].qq as number,
       };
     }
-    else if (event.replyTo && event.replyTo.fromId === this.oicq.uin) {
+    else if (event.replyTo && event.replyTo.fromId === this.qqClient.uin) {
       // 来自 tg
       const sourceMessage = await db.message.findFirst({
         where: {
@@ -94,13 +92,7 @@ export default class {
     }
     else if (event.replyTo) {
       const sourceMember = (pair.qq as Group).pickMember(event.replyTo.fromId);
-      let memberInfo: GroupMemberInfo;
-      if (sourceMember instanceof OicqMember) {
-        memberInfo = sourceMember.info;
-      }
-      else {
-        memberInfo = await sourceMember.renew();
-      }
+      const memberInfo = await sourceMember.renew();
       to = {
         from: 'qq',
         name: memberInfo.card || memberInfo.nickname,
@@ -230,7 +222,7 @@ export default class {
     await db.message.create({
       data: {
         qqRoomId: pair.qqRoomId,
-        qqSenderId: this.oicq.uin,
+        qqSenderId: this.qqClient.uin,
         time: qqMessage.time,
         brief: tgText,
         seq: qqMessage.seq,

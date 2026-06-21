@@ -1,11 +1,8 @@
 import { Pair } from '../models/Pair';
-import { Member as OicqMember } from '@icqqjs/icqq';
 import { format } from 'date-fns';
-import { Group, GroupMemberInfo } from '../client/QQClient';
-import { NapCatFriend, NapCatGroupMember } from '../client/NapCatClient';
+import { Group, GroupMemberInfo, UserProfile } from '../client/QQClient';
 import { Elysia } from 'elysia';
 import { html, Html } from '@elysiajs/html';
-import { UserProfile } from '@icqqjs/icqq/lib/common';
 import { getLogger } from 'log4js';
 import posthog from '../models/posthog';
 
@@ -24,40 +21,13 @@ export default new Elysia()
       if (!member) {
         return 'Member not found';
       }
-      let profile: UserProfile, memberInfo: GroupMemberInfo;
-      if (member instanceof OicqMember) {
-        memberInfo = member.info;
-        profile = await member.client.getProfile(member.uin);
-      }
-      else if (member instanceof NapCatGroupMember) {
-        memberInfo = await member.renew();
-        const user = await member.client.pickFriend(member.uin) as NapCatFriend;
-        const info = await user.renew();
-        profile = {
-          // @ts-ignore
-          birthday: [info.birthday_year, info.birthday_month, info.birthday_day],
-          // @ts-ignore
-          email: info.eMail,
-          nickname: info.nickname,
-          // @ts-ignore
-          city: info.city || info.detail?.commonExt?.city,
-          QID: info.qid,
-          // @ts-ignore
-          country: info.country || info.detail?.commonExt?.country || '',
-          // @ts-ignore
-          province: info.province || info.detail?.commonExt?.province || '',
-          signature: '',
-          // @ts-ignore
-          regTimestamp: info.regTime || info.detail?.commonExt?.regTime || '',
-        } as any;
-      }
-      else {
-        return 'Unknown client type';
-      }
+      const memberInfo: GroupMemberInfo = await member.renew();
+      const profile: UserProfile = member.getProfile ? await member.getProfile() : {};
 
       const now = new Date();
       const location = [profile.country, profile.province, profile.city].join(' ').trim();
       const birthday = (profile.birthday || []).some(it => it) ? profile.birthday.join('/') : '';
+      const regTimestamp = Number(profile.regTimestamp || 0);
 
       return <html lang="zh">
       <head>
@@ -181,10 +151,10 @@ export default new Elysia()
             <div class="secondary">上次发言时间</div>
             {format(new Date(memberInfo.last_sent_time * 1000), 'yyyy-MM-dd HH:mm')}
           </div>
-          <div class="detailItem">
+          {regTimestamp > 0 && <div class="detailItem">
             <div class="secondary">注册时间</div>
-            {format(new Date(profile.regTimestamp * 1000), 'yyyy-MM-dd HH:mm')}
-          </div>
+            {format(new Date(regTimestamp * 1000), 'yyyy-MM-dd HH:mm')}
+          </div>}
         </div>
       </div>
       </body>
@@ -195,4 +165,3 @@ export default new Elysia()
       posthog.capture('RichHeaderError', { error: e });
     }
   });
-

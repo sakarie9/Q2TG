@@ -30,13 +30,13 @@ export default class ForwardController {
     private readonly instance: Instance,
     private readonly tgBot: Telegram,
     private readonly tgUser: Telegram,
-    private readonly oicq: QQClient,
+    private readonly qqClient: QQClient,
   ) {
     this.log = getLogger(`ForwardController - ${instance.id}`);
-    this.forwardService = new ForwardService(this.instance, tgBot, oicq);
-    oicq.addNewMessageEventHandler(this.onQqMessage);
-    oicq.addGroupMemberIncreaseEventHandler(this.onQqGroupMemberIncrease);
-    oicq.addPokeEventHandler(this.onQqPoke);
+    this.forwardService = new ForwardService(this.instance, tgBot, qqClient);
+    qqClient.addNewMessageEventHandler(this.onQqMessage);
+    qqClient.addGroupMemberIncreaseEventHandler(this.onQqGroupMemberIncrease);
+    qqClient.addPokeEventHandler(this.onQqPoke);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
     tgUser.addNewMessageEventHandler(this.onTelegramUserMessage);
     tgBot.addEditedMessageEventHandler(this.onTelegramMessage);
@@ -50,7 +50,7 @@ export default class ForwardController {
       if (!pair) return;
       if ((pair.flags | this.instance.flags) & flags.DISABLE_Q2TG) return;
       // 如果是多张图片的话，是一整条消息，只过一次，所以不受这个判断影响
-      // 防止私聊消息重复，icqq bug
+      // 防止私聊消息重复
       let existed = event.dm && await db.message.findFirst({
         where: {
           qqRoomId: pair.qqRoomId,

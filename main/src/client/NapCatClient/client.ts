@@ -1,4 +1,4 @@
-import { CreateQQClientParamsBase, Friend, FriendIncreaseEvent, Group, GroupMemberDecreaseEvent, GroupMemberIncreaseEvent, GroupNameChangeEvent, InputStatusChangeEvent, MessageEvent, MessageRecallEvent, PokeEvent, QQClient, SendableElem } from '../QQClient';
+import { CreateNapCatParams, Friend, FriendIncreaseEvent, Group, GroupMemberDecreaseEvent, GroupMemberIncreaseEvent, GroupNameChangeEvent, ImageElem, InputStatusChangeEvent, MessageEvent, MessageRecallEvent, PokeEvent, QQClient, SendableElem } from '../QQClient';
 import random from '../../utils/random';
 import { getLogger, Logger } from 'log4js';
 import posthog from '../../models/posthog';
@@ -6,15 +6,11 @@ import type { Receive, WSReceiveHandler, WSSendParam, WSSendReturn } from 'node-
 import { NapCatFriend, NapCatGroup } from './entity';
 import { napCatReceiveToMessageElem } from './convert';
 import { NapCatFriendRequestEvent, NapCatGroupEvent, NapCatGroupInviteEvent } from './event';
-import type { ImageElem } from '@icqqjs/icqq';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
-export interface CreateNapCatParams extends CreateQQClientParamsBase {
-  type: 'napcat';
-  wsUrl: string;
-}
-
 export class NapCatClient extends QQClient {
+  public readonly kind = 'napcat' as const;
+
   private constructor(id: number, private readonly wsUrl: string) {
     super(id);
     this.logger = getLogger(`NapCatClient - ${id}`);

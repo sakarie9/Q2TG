@@ -8,8 +8,7 @@ import { CustomFile } from 'telegram/client/uploads';
 import { getAvatar } from '../utils/urls';
 import db from '../models/db';
 import { format } from 'date-fns';
-import { QQClient, Group, GroupMemberInfo } from '../client/QQClient';
-import { Member as OicqMember, Group as OicqGroup, Friend as OicqFriend } from '@icqqjs/icqq';
+import { Friend, QQClient, Group, GroupMemberInfo } from '../client/QQClient';
 import posthog from '../models/posthog';
 
 export default class InChatCommandsService {
@@ -17,7 +16,7 @@ export default class InChatCommandsService {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`InChatCommandsService - ${instance.id}`);
   }
 
@@ -37,15 +36,12 @@ export default class InChatCommandsService {
             textToSend += `<b>发送者：</b>${pair.qq.remark || pair.qq.nickname}(<code>${pair.qq.uin}</code>)\n`;
           }
           else {
-            textToSend += `<b>发送者：</b>${this.oicq.nickname}(<code>${this.oicq.uin}</code>)\n`;
+            textToSend += `<b>发送者：</b>${this.qqClient.nickname}(<code>${this.qqClient.uin}</code>)\n`;
           }
         }
         else {
           const sender = pair.qq.pickMember(Number(messageInfo.qqSenderId));
-          let memberInfo: GroupMemberInfo;
-          if (sender instanceof OicqMember) {
-            memberInfo = await sender.renew();
-          }
+          const memberInfo: GroupMemberInfo = await sender.renew();
 
           textToSend += `<b>发送者：</b>${memberInfo.title ? `「<i>${memberInfo.title}</i>」` : ''}` +
             `${memberInfo.card || memberInfo.nickname}(<code>${sender.uin}</code>)\n`;
@@ -96,7 +92,7 @@ export default class InChatCommandsService {
       });
       return;
     }
-    const qq = pair.qq as OicqFriend | OicqGroup;
+    const qq = pair.qq;
     try {
       let target: number;
       if (message.replyToMsgId) {
@@ -118,8 +114,8 @@ export default class InChatCommandsService {
       else if ('pokeMember' in qq) {
         await qq.pokeMember(target);
       }
-      else {
-        await qq.poke(target && target !== pair.qqRoomId);
+      else if ('poke' in qq) {
+        await (qq as Friend).poke(target && target !== pair.qqRoomId);
       }
     }
     catch (e) {

@@ -1,6 +1,5 @@
-import { Friend, Group, QQUser, Sendable } from './index';
-import type { MessageElem } from '@icqqjs/icqq';
-import { FaceElemEx, NapCatForwardElem } from '../NapCatClient/convert';
+import { Friend, Group, GroupMember, Sendable } from './index';
+import type { MessageElem } from './entity';
 
 export abstract class ChatEvent {
   protected constructor(
@@ -19,7 +18,7 @@ export abstract class ChatEvent {
   }
 }
 
-export type MessageElemRecv = MessageElem | NapCatForwardElem | FaceElemEx;
+export type MessageElemRecv = MessageElem;
 
 export class MessageEvent extends ChatEvent {
   constructor(
@@ -127,7 +126,7 @@ export class InputStatusChangeEvent {
 export class GroupNameChangeEvent {
   constructor(
     public readonly group: Group,
-    public readonly operator: QQUser,
+    public readonly operator: GroupMember,
     public readonly newName: string,
   ) {
   }

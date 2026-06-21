@@ -15,7 +15,7 @@ export default class FileAndFlashPhotoController {
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
     this.log = getLogger(`FileAndFlashPhotoController - ${instance.id}`);
   }
@@ -40,7 +40,7 @@ export default class FileAndFlashPhotoController {
       const fileInfo = await db.file.findFirst({
         where: { id },
       });
-      const downloadUrl = new URL(await (await this.oicq.getChat(Number(fileInfo.roomId))).getFileUrl(fileInfo.fileId));
+      const downloadUrl = new URL(await (await this.qqClient.getChat(Number(fileInfo.roomId))).getFileUrl(fileInfo.fileId));
       if (!downloadUrl.searchParams.get('fname')) {
         downloadUrl.searchParams.set('fname', fileInfo.name);
       }

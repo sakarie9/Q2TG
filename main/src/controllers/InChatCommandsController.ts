@@ -5,8 +5,7 @@ import Telegram from '../client/Telegram';
 import { Api } from 'telegram';
 import flags from '../constants/flags';
 import { editFlags } from '../utils/flagControl';
-import { QQClient } from '../client/QQClient';
-import { Group } from '@icqqjs/icqq';
+import { Group, QQClient } from '../client/QQClient';
 
 export default class InChatCommandsController {
   private readonly service: InChatCommandsService;
@@ -16,10 +15,10 @@ export default class InChatCommandsController {
     private readonly instance: Instance,
     private readonly tgBot: Telegram,
     private readonly tgUser: Telegram,
-    private readonly oicq: QQClient,
+    private readonly qqClient: QQClient,
   ) {
     this.log = getLogger(`InChatCommandsController - ${instance.id}`);
-    this.service = new InChatCommandsService(instance, tgBot, oicq);
+    this.service = new InChatCommandsService(instance, tgBot, qqClient);
     tgBot.addNewMessageEventHandler(this.onTelegramMessage);
   }
 

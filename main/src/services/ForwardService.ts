@@ -1,13 +1,4 @@
 import Telegram from '../client/Telegram';
-import {
-  FaceElem,
-  Group as OicqGroup,
-  Friend as OicqFriend,
-  PttElem,
-  Quotable,
-  segment,
-} from '@icqqjs/icqq';
-import { Contactable } from '@icqqjs/icqq/lib/internal';
 import { fetchFile, getBigFaceUrl, getImageUrlByMd5, isContainsUrl } from '../utils/urls';
 import { ButtonLike, FileLike } from 'telegram/define';
 import { getLogger, Logger } from 'log4js';
@@ -15,7 +6,7 @@ import helper from '../helpers/forwardHelper';
 import db from '../models/db';
 import { Button } from 'telegram/tl/custom/button';
 import { SendMessageParams } from 'telegram/client/messages';
-import { Api, utils } from 'telegram';
+import { Api } from 'telegram';
 import { file as createTempFileBase, FileResult } from 'tmp-promise';
 // @ts-ignore
 import eviltransform from 'eviltransform';
@@ -24,20 +15,17 @@ import axios from 'axios';
 import { md5Hex } from '../utils/hashing';
 import Instance from '../models/Instance';
 import { Pair } from '../models/Pair';
-import OicqClient from '../client/OicqClient';
 import lottie from '../constants/lottie';
 import _ from 'lodash';
 import emoji from '../constants/emoji';
 import convert from '../helpers/convert';
 import { QQMessageSent } from '../types/definitions';
-import Docker from 'dockerode';
-import ReplyKeyboardHide = Api.ReplyKeyboardHide;
 import env from '../models/env';
 import { CustomFile } from 'telegram/client/uploads';
 import flags from '../constants/flags';
 import BigInteger from 'big-integer';
 import pastebin from '../utils/pastebin';
-import { ForwardMessage, Group, MessageEvent, QQClient, Sendable, SendableElem } from '../client/QQClient';
+import { ForwardMessage, Group, GroupRole, MessageEvent, QQClient, Quotable, Sendable, SendableElem } from '../client/QQClient';
 import posthog from '../models/posthog';
 import { NapCatClient } from '../client/NapCatClient';
 import fsP from 'fs/promises';
@@ -47,9 +35,8 @@ import qfaceChannelMap from '../constants/qfaceChannelMap';
 import { FaceElemEx } from '../client/NapCatClient/convert';
 import nameColor from '../constants/nameColor';
 import memberRoleCache from '../helpers/memberRoleCache';
-import { GroupRole } from '@icqqjs/icqq/lib/common';
 import path from 'path';
-import { fileTypeFromBuffer, fileTypeFromFile, FileTypeResult } from 'file-type';
+import { fileTypeFromFile } from 'file-type';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
@@ -67,30 +54,11 @@ type CrhPlayerInfo = {
 // noinspection FallThroughInSwitchStatementJS
 export default class ForwardService {
   private readonly log: Logger;
-  private readonly restartSignCallbackHandle?: Buffer;
 
   constructor(private readonly instance: Instance,
               private readonly tgBot: Telegram,
-              private readonly oicq: QQClient) {
+              private readonly qqClient: QQClient) {
     this.log = getLogger(`ForwardService - ${instance.id}`);
-    if (oicq instanceof OicqClient && oicq.signDockerId) {
-      const socket = new Docker({ socketPath: '/var/run/docker.sock' });
-      const container = socket.getContainer(oicq.signDockerId);
-      this.restartSignCallbackHandle = tgBot.registerCallback(async (event) => {
-        const message = await event.edit({
-          message: event.messageId,
-          text: '正在重启签名服务...',
-          buttons: new ReplyKeyboardHide({}),
-        });
-        await container.restart();
-        await event.answer({
-          message: '已发送重启指令',
-        });
-        await message.reply({
-          message: '已发送重启指令\n你需要稍后重新发送一下消息',
-        });
-      });
-    }
     this.initStickerPack()
       .then(() => this.log.info('Sticker Pack 初始化完成'))
       .catch(e => {
@@ -250,7 +218,7 @@ export default class ForwardService {
         // 我们不要这些东西
         // 对机器人的 at 和回复的 at
         // 对机器人的 at 已经在 atMe 里面处理了
-        .filter(elem => !(elem.type === 'at' && elem.qq === this.oicq.uin))
+        .filter(elem => !(elem.type === 'at' && elem.qq === this.qqClient.uin))
         // 对回复的消息的发送者的 at 纯属多余，腾讯生成这个 at 就是脑子有毛病
         .filter(elem => !(elem.type === 'at' && elem.qq === event.replyTo?.fromId))
         // 防止出现 [/狼狗]/狼狗 这个情况，不知道后面那个 text 是怎么来的
@@ -304,25 +272,27 @@ export default class ForwardService {
           }
           case 'face':
             // 判断 tgs 表情
-            const tgs = this.getStickerByQQFaceId(elem.id, (elem as FaceElemEx).resultId);
+            const face = elem as FaceElemEx;
+            const tgs = this.getStickerByQQFaceId(face.id, face.resultId);
             if (tgs && chain.length === 1) {
               useSticker(tgs);
             }
           case 'sface': {
-            if (typeof elem.text !== 'string') {
-              if (qface[elem.id]) {
-                elem.text = qface[elem.id];
+            const face = elem as FaceElemEx;
+            if (typeof face.text !== 'string') {
+              if (qface[face.id]) {
+                face.text = qface[face.id];
               }
               else {
-                elem.text = '表情:' + elem.id;
+                face.text = '表情:' + face.id;
               }
             }
-            if (qfaceChannelMap[elem.id]) {
-              message += `[<i><a href="https://t.me/qq_face/${qfaceChannelMap[elem.id]}">${helper.htmlEscape(elem.text)}</a></i>]`;
+            if (qfaceChannelMap[face.id]) {
+              message += `[<i><a href="https://t.me/qq_face/${qfaceChannelMap[face.id]}">${helper.htmlEscape(face.text)}</a></i>]`;
               isContainAtOrChannelFace = true;
             }
             else {
-              message += `[<i>${helper.htmlEscape(elem.text)}</i>]`;
+              message += `[<i>${helper.htmlEscape(face.text)}</i>]`;
             }
             break;
           }
@@ -338,8 +308,11 @@ export default class ForwardService {
           case 'image':
             if ('url' in elem)
               url = elem.url;
-            if (this.oicq instanceof NapCatClient && !url.startsWith('http')) {
-              const ret = await this.oicq.callApi('download_file', { url: 'file://' + url });
+            if (!url && typeof elem.file === 'string') {
+              url = elem.file;
+            }
+            if (this.qqClient instanceof NapCatClient && url && !url.startsWith('http')) {
+              const ret = await this.qqClient.callApi('download_file', { url: 'file://' + url });
               url = ret.file;
               tempFiles.push({
                 path: url,
@@ -452,18 +425,11 @@ export default class ForwardService {
             break;
           }
           case 'record': {
-            url = elem.url;
-            if (!url && pair.qq instanceof Contactable && elem.md5 === 'ntptt') {
-              url = await pair.qq.getPttUrl(elem);
-            }
-            else if (!url && this.oicq instanceof OicqClient) {
-              const refetchMessage = await this.oicq.oicq.getMsg(event.messageId);
-              url = (refetchMessage.message.find(it => it.type === 'record') as PttElem).url;
-            }
+            url = elem.url || (typeof elem.file === 'string' ? elem.file : undefined);
             if (url) {
               let bufSilk: Buffer;
-              if (this.oicq instanceof NapCatClient) {
-                const ret = await this.oicq.callApi('download_file', { url });
+              if (this.qqClient instanceof NapCatClient) {
+                const ret = await this.qqClient.callApi('download_file', { url });
                 bufSilk = await fsP.readFile(ret.file);
                 fsP.unlink(ret.file);
               }
@@ -670,17 +636,22 @@ export default class ForwardService {
       if (richHeaderUsed) {
         // 测试 Web Preview 内容是否被正确获取
         setTimeout(async () => {
-          // Telegram Bot 账号无法获取 Web 预览内容，只能用 User 账号获取
-          const userMessage = await pair.tgUser.getMessage({
-            ids: tgMessage.id,
-          });
-          if (['WebPage', 'WebPageNotModified'].includes((userMessage?.media as Api.MessageMediaWebPage)?.webpage?.className))
-            return;
-          // 没有正常获取的话，就加上原先的头部
-          this.log.warn('Rich Header 回测错误', messageToSend.file);
-          await tgMessage.edit({
-            text: messageHeaderWithLink + (message && messageHeaderWithLink ? '\n' : '') + message,
-          });
+          try {
+            // Telegram Bot 账号无法获取 Web 预览内容，只能用 User 账号获取
+            const userMessage = await pair.tgUser.getMessage({
+              ids: tgMessage.id,
+            });
+            if (['WebPage', 'WebPageNotModified'].includes((userMessage?.media as Api.MessageMediaWebPage)?.webpage?.className))
+              return;
+            // 没有正常获取的话，就加上原先的头部
+            this.log.warn('Rich Header 回测错误', messageToSend.file);
+            await tgMessage.edit({
+              text: messageHeaderWithLink + (message && messageHeaderWithLink ? '\n' : '') + message,
+            });
+          }
+          catch (e) {
+            this.log.warn('Rich Header 回测失败', e);
+          }
         }, 3000);
       }
 
@@ -780,7 +751,7 @@ export default class ForwardService {
         if ('spoiler' in message.media && message.media.spoiler) {
           isSpoilerPhoto = true;
 
-          chain.push(...await this.oicq.createSpoilerImageEndpoint({
+          chain.push(...await this.qqClient.createSpoilerImageEndpoint({
             type: 'image',
             file: await message.downloadMedia({}),
             asface: !!message.sticker,
@@ -811,7 +782,10 @@ export default class ForwardService {
           const temp = await createTempFile();
           tempFiles.push(temp);
           await message.downloadMedia({ outputFile: temp.path });
-          chain.push(segment.video(temp.path));
+          chain.push({
+            type: 'video',
+            file: temp.path,
+          });
         }
         brief += '[视频]';
       }
@@ -832,13 +806,10 @@ export default class ForwardService {
         const temp = await createTempFile();
         tempFiles.push(temp);
         await message.downloadMedia({ outputFile: temp.path });
-        if (this.oicq instanceof OicqClient) {
-          const bufSilk = await silk.encode(temp.path);
-          chain.push(segment.record(bufSilk));
-        }
-        else if (this.oicq instanceof NapCatClient) {
-          chain.push(segment.record(temp.path));
-        }
+        chain.push({
+          type: 'record',
+          file: temp.path,
+        });
         brief += '[语音]';
       }
       else if (message.poll) {
@@ -858,23 +829,13 @@ export default class ForwardService {
       else if (message.venue && message.venue.geo instanceof Api.GeoPoint) {
         // 地标
         const geo: { lat: number, lng: number } = eviltransform.wgs2gcj(message.venue.geo.lat, message.venue.geo.long);
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
-          chain.push(segment.location(geo.lat, geo.lng, `${message.venue.title} (${message.venue.address})`) as any);
-        }
-        else {
-          chain.push(`[位置：${message.venue.title} (${message.venue.address})]`);
-        }
+        chain.push(`[位置：${message.venue.title} (${message.venue.address})]\nhttps://uri.amap.com/marker?position=${geo.lng},${geo.lat}`);
         brief += `[位置：${message.venue.title}]`;
       }
       else if (message.geo instanceof Api.GeoPoint) {
         // 普通的位置，没有名字
         const geo: { lat: number, lng: number } = eviltransform.wgs2gcj(message.geo.lat, message.geo.long);
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
-          chain.push(segment.location(geo.lat, geo.lng, '选中的位置') as any);
-        }
-        else {
-          chain.push(`[位置：${geo.lat} ${geo.lng}]\nhttps://uri.amap.com/marker?position=${geo.lng},${geo.lat}`);
-        }
+        chain.push(`[位置：${geo.lat} ${geo.lng}]\nhttps://uri.amap.com/marker?position=${geo.lng},${geo.lat}`);
         brief += '[位置]';
       }
       else if (message.media instanceof Api.MessageMediaDocument && message.media.document instanceof Api.Document) {
@@ -977,7 +938,7 @@ export default class ForwardService {
               seq: 1,
               time: Math.floor(new Date().getTime() / 1000),
               rand: 1,
-              user_id: this.oicq.uin,
+              user_id: this.qqClient.uin,
             };
           }
         }
@@ -989,7 +950,7 @@ export default class ForwardService {
             seq: 1,
             time: Math.floor(new Date().getTime() / 1000),
             rand: 1,
-            user_id: this.oicq.uin,
+            user_id: this.qqClient.uin,
           };
         }
       }
@@ -1001,39 +962,6 @@ export default class ForwardService {
 
       const notChainableElements = chain.filter(element => typeof element === 'object' && NOT_CHAINABLE_ELEMENTS.includes(element.type));
       const chainableElements = chain.filter(element => typeof element !== 'object' || !NOT_CHAINABLE_ELEMENTS.includes(element.type));
-
-      // MapInstance
-      if (!notChainableElements.length // notChainableElements 无法附加 mirai 信息，要防止被来回转发
-        && chainableElements.length
-        && this.instance.workMode
-        && pair.instanceMapForTg[senderId]
-        && !((pair.flags | this.instance.flags) & flags.DISABLE_SEAMLESS)
-      ) {
-        try {
-          const messageSent = await pair.instanceMapForTg[senderId].sendMsg([
-            ...chainableElements,
-            {
-              type: 'mirai',
-              data: JSON.stringify({
-                id: senderId,
-                eqq: { type: 'tg', tgUid: senderId, noSplitSender: true, version: 2 },
-                q2tgSkip: true,
-              }, undefined, 0),
-              // 能启用无缝模式一定是 icqq 而不是 NapCat
-            } as any,
-          ], source);
-          tempFiles.forEach(it => it.cleanup());
-          return [{
-            ...messageSent,
-            senderId: pair.instanceMapForTg[senderId] instanceof OicqGroup ? pair.instanceMapForTg[senderId].client.uin : 0,//TODO
-            brief,
-          }];
-        }
-        catch (e) {
-          this.log.error('使用 MapInstance 发送消息失败', e);
-          posthog.capture('使用 MapInstance 发送消息失败', { error: e });
-        }
-      }
 
       if (this.instance.workMode === 'group' && !isSpoilerPhoto) {
         let headerImage: string;
@@ -1081,20 +1009,11 @@ export default class ForwardService {
       }
       const qqMessages = [] as Array<QQMessageSent>;
       if (chainableElements.length) {
-        if (this.oicq instanceof OicqGroup || this.oicq instanceof OicqFriend) {
-          chainableElements.push({
-            type: 'mirai',
-            data: JSON.stringify({
-              id: senderId,
-              eqq: { type: 'tg', tgUid: senderId, noSplitSender: this.instance.workMode === 'personal', version: 2 },
-            }, undefined, 0),
-          } as any);
-        }
         let messageToSend: Sendable = chainableElements;
         qqMessages.push({
           ...await pair.qq.sendMsg(messageToSend, source),
           brief,
-          senderId: this.oicq.uin,
+          senderId: this.qqClient.uin,
         });
       }
       if (notChainableElements.length) {
@@ -1102,7 +1021,7 @@ export default class ForwardService {
           qqMessages.push({
             ...await pair.qq.sendMsg(notChainableElement, source),
             brief,
-            senderId: this.oicq.uin,
+            senderId: this.qqClient.uin,
           });
         }
       }
@@ -1115,9 +1034,6 @@ export default class ForwardService {
       try {
         await message.reply({
           message: `<i>转发失败：${e.message}</i>`,
-          buttons: (e.message === '签名api异常' && this.restartSignCallbackHandle) ?
-            Button.inline('重启签名服务', this.restartSignCallbackHandle) :
-            undefined,
         });
       }
       catch {
