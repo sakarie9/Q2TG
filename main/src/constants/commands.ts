@@ -10,7 +10,7 @@ const preSetupCommands = [
 const commonPrivateCommands = [
   new Api.BotCommand({
     command: 'login',
-    description: '当 QQ 处于下线状态时，使用此命令重新登录 QQ',
+    description: '智能重新登录 QQ 或 Telegram UserBot',
   }),
   new Api.BotCommand({
     command: 'flags',
@@ -19,10 +19,6 @@ const commonPrivateCommands = [
   new Api.BotCommand({
     command: 'alive',
     description: '状态信息',
-  }),
-  new Api.BotCommand({
-    command: 'relogin',
-    description: '重新扫码登录 Telegram UserBot',
   }),
 ];
 

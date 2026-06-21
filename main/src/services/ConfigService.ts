@@ -33,7 +33,7 @@ export default class ConfigService {
 
   private async requireUserBot() {
     if (!this.tgUser) {
-      await (await this.owner).sendMessage('UserBot 未登录，无法执行此操作。请发送 /relogin 扫码登录。');
+      await (await this.owner).sendMessage('UserBot 未登录，无法执行此操作。请发送 /login 扫码登录。');
       throw new Error('TG UserBot 未登录');
     }
     return this.tgUser;

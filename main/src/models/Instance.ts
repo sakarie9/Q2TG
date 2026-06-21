@@ -177,7 +177,7 @@ export default class Instance {
     }
     if (!this._userSessionId) {
       this.log.warn('未配置 TG UserBot session，跳过 TG UserBot 登录');
-      await this.notifyOwner('UserBot 未登录，部分功能不可用。请发送 /relogin 扫码登录。');
+      await this.notifyOwner('UserBot 未登录，部分功能不可用。请发送 /login 扫码登录。');
       return;
     }
     try {
@@ -189,7 +189,7 @@ export default class Instance {
       this.tgUser = undefined;
       this.log.error('TG UserBot 登录失败，继续以 Bot 模式运行', e);
       posthog.capture('TG UserBot 登录失败', { error: e });
-      await this.notifyOwner('UserBot 登录失败，程序已继续运行但部分功能不可用。请发送 /relogin 重新扫码登录。');
+      await this.notifyOwner('UserBot 登录失败，程序已继续运行但部分功能不可用。请发送 /login 重新扫码登录。');
     }
   }
 

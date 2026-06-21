@@ -63,14 +63,8 @@ export default class ConfigController {
     }
     else if (message.isPrivate) {
       switch (messageSplit[0]) {
-        case '/relogin':
-          try {
-            await this.instance.loginUserBotWithQrCode();
-          }
-          catch (e) {
-            this.log.error('UserBot 扫码登录失败', e);
-            await message.reply({ message: `UserBot 登录失败：<code>${e.message}</code>` });
-          }
+        case '/login':
+          await this.handleLogin(message);
           return true;
         case '/flag':
         case '/flags':
@@ -90,9 +84,6 @@ export default class ConfigController {
             return true;
           case '/migrate':
             await this.configService.migrateAllChats();
-            return true;
-          case '/login':
-            await this.qqClient.login();
             return true;
           case '/refresh_all':
             await this.configService.refreshAll();
@@ -117,6 +108,46 @@ export default class ConfigController {
       }
     }
   };
+
+  private async handleLogin(message: Api.Message) {
+    let qqOnline = false;
+    try {
+      qqOnline = await this.qqClient.isOnline();
+    }
+    catch (e) {
+      this.log.warn('检查 QQ 在线状态失败，将尝试重新登录 QQ', e);
+    }
+
+    const userBotOnline = !!this.tgUser?.isOnline;
+    if (qqOnline && userBotOnline) {
+      await message.reply({ message: 'QQ 和 UserBot 当前都在线，无需重新登录。' });
+      return;
+    }
+
+    if (!qqOnline) {
+      await message.reply({ message: 'QQ 当前离线，正在尝试重新登录 QQ。' });
+      try {
+        await this.qqClient.login();
+        qqOnline = await this.qqClient.isOnline().catch(() => false);
+        await message.reply({ message: qqOnline ? 'QQ 已在线。' : 'QQ 重新登录已触发，但当前仍显示离线。' });
+      }
+      catch (e) {
+        this.log.error('QQ 重新登录失败', e);
+        await message.reply({ message: `QQ 重新登录失败：<code>${e.message}</code>` });
+      }
+    }
+
+    if (!userBotOnline) {
+      await message.reply({ message: 'UserBot 当前离线，正在生成扫码登录二维码。' });
+      try {
+        await this.instance.loginUserBotWithQrCode();
+      }
+      catch (e) {
+        this.log.error('UserBot 扫码登录失败', e);
+        await message.reply({ message: `UserBot 登录失败：<code>${e.message}</code>` });
+      }
+    }
+  }
 
   private handleServiceMessage = async (message: Api.MessageService) => {
     // 用于检测群升级为超级群的情况
