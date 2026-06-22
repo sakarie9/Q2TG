@@ -41,7 +41,7 @@ export default defineComponent({
     };
 
     const saveButton = () => {
-      if (!['image', 'flash', 'video', 'record', 'file'].includes(props.elem.type) || props.elem.localUrl) {
+      if (props.elem.type !== 'video' || props.elem.localUrl) {
         return null;
       }
       return <NButton class="mt-4px" size="tiny" loading={saving.value} onClick={saveMedia}>

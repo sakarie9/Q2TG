@@ -175,6 +175,50 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
   return elem;
 };
 
+export const cacheForwardImages = async (uuid: string, messages: CachedForwardMessage[], qq: QQEntity) => {
+  const tasks: number[][] = [];
+  let changed = false;
+
+  for (const [messageIndex, message] of messages.entries()) {
+    for (const [elemIndex, elem] of message.message.entries()) {
+      if (elem.type !== 'image' && elem.type !== 'flash') continue;
+      const cacheKey = buildMediaKey(elem);
+      if (!cacheKey) continue;
+      const cachedElem = elem as CachedMessageElem;
+
+      const existing = findCachedMedia(uuid, cacheKey);
+      if (existing) {
+        const localUrl = publicUrl(uuid, existing);
+        if (
+          cachedElem.cacheKey !== cacheKey ||
+          cachedElem.localUrl !== localUrl ||
+          cachedElem.downloadStatus !== 'cached' ||
+          cachedElem.downloadName !== existing
+        ) {
+          cachedElem.cacheKey = cacheKey;
+          cachedElem.localUrl = localUrl;
+          cachedElem.downloadStatus = 'cached';
+          cachedElem.downloadName = existing;
+          changed = true;
+        }
+        continue;
+      }
+
+      tasks.push([messageIndex, elemIndex]);
+    }
+  }
+
+  for (let i = 0; i < tasks.length; i += 4) {
+    const batch = tasks.slice(i, i + 4);
+    const results = await Promise.allSettled(batch.map(path => downloadForwardMedia(uuid, messages, path, qq)));
+    if (results.some(result => result.status === 'fulfilled')) {
+      changed = true;
+    }
+  }
+
+  return changed;
+};
+
 export const getMediaFile = async (uuid: string, filename: string) => {
   const resolved = path.resolve(forwardDir(uuid), filename);
   const root = path.resolve(forwardDir(uuid));
