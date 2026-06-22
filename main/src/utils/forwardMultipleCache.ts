@@ -7,6 +7,7 @@ import { MessageElem, ForwardMessage, QQEntity } from '../client/QQClient';
 import { fetchFile, getImageUrlByMd5 } from './urls';
 import env from '../models/env';
 import { md5Hex } from './hashing';
+import silk from '../encoding/silk';
 
 export type CachedForwardMessage = ForwardMessage & {
   message: CachedMessageElem[];
@@ -113,6 +114,25 @@ const saveFromUrl = async (uuid: string, cacheKey: string, url: string, fallback
   return await writeBuffer(uuid, cacheKey, buffer, fallbackExt);
 };
 
+const writeSilkAsOgg = async (uuid: string, cacheKey: string, buffer: Buffer) => {
+  await fsP.mkdir(forwardDir(uuid), { recursive: true });
+  const filename = `${md5Hex(cacheKey)}.ogg`;
+  const filePath = path.join(forwardDir(uuid), filename);
+  await silk.decode(buffer, filePath);
+  return filename;
+};
+
+const saveSilkUrlAsOgg = async (uuid: string, cacheKey: string, url: string) => {
+  const buffer = await fetchFile(url);
+  return await writeSilkAsOgg(uuid, cacheKey, buffer);
+};
+
+const copySilkAsOgg = async (uuid: string, cacheKey: string, sourcePath: string) => {
+  sourcePath = sourcePath.replace(/^file:\/\//, '');
+  const buffer = await fsP.readFile(sourcePath);
+  return await writeSilkAsOgg(uuid, cacheKey, buffer);
+};
+
 export const downloadForwardMedia = async (uuid: string, messages: CachedForwardMessage[], indexPath: number[], qq: QQEntity) => {
   const elem = getElemByPath(messages, indexPath);
   if (!elem) throw new Error('媒体不存在');
@@ -158,7 +178,7 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
     case 'record': {
       const url = elem.url || (typeof elem.file === 'string' ? elem.file : '');
       if (!url) throw new Error('语音下载地址为空');
-      filename = /^https?:\/\//.test(url) ? await saveFromUrl(uuid, cacheKey, url, 'silk') : await copyFile(uuid, cacheKey, url, 'silk');
+      filename = /^https?:\/\//.test(url) ? await saveSilkUrlAsOgg(uuid, cacheKey, url) : await copySilkAsOgg(uuid, cacheKey, url);
       break;
     }
     case 'file': {
@@ -175,13 +195,13 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
   return elem;
 };
 
-export const cacheForwardImages = async (uuid: string, messages: CachedForwardMessage[], qq: QQEntity) => {
+export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForwardMessage[], qq: QQEntity) => {
   const tasks: number[][] = [];
   let changed = false;
 
   for (const [messageIndex, message] of messages.entries()) {
     for (const [elemIndex, elem] of message.message.entries()) {
-      if (elem.type !== 'image' && elem.type !== 'flash') continue;
+      if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record') continue;
       const cacheKey = buildMediaKey(elem);
       if (!cacheKey) continue;
       const cachedElem = elem as CachedMessageElem;

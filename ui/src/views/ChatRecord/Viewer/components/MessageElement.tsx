@@ -96,8 +96,8 @@ export default defineComponent({
             <video src={props.elem.localUrl || props.elem.url} controls width={240}/> :
             <div>[视频]</div>);
         case 'record':
-          return mediaWrap(props.elem.localUrl || props.elem.url ?
-            <audio src={props.elem.localUrl || props.elem.url} controls/> :
+          return mediaWrap(props.elem.localUrl ?
+            <audio src={props.elem.localUrl} controls/> :
             <div>[语音]</div>);
         case 'file':
           return mediaWrap(props.elem.localUrl ?

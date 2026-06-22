@@ -4,7 +4,7 @@ import { Pair } from '../../models/Pair';
 import processNestedForward from '../../utils/processNestedForward';
 import {
   CachedForwardMessage,
-  cacheForwardImages,
+  cacheForwardInlineMedia,
   downloadForwardMedia,
   getMediaFile,
   prepareForwardMessages,
@@ -90,7 +90,7 @@ const loadForwardMessages = async (uuid: string): Promise<CachedForwardMessage[]
 
     const messages = forwardCache.get(uuid) as CachedForwardMessage[];
     const pair = Pair.getByDbId(data.fromPairId);
-    if (await cacheForwardImages(uuid, messages, pair.qq)) {
+    if (await cacheForwardInlineMedia(uuid, messages, pair.qq)) {
       await saveForwardMessages(uuid, messages);
     }
 
