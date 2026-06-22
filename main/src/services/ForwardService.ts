@@ -427,18 +427,18 @@ export default class ForwardService {
           case 'record': {
             url = elem.url || (typeof elem.file === 'string' ? elem.file : undefined);
             if (url) {
-              let bufSilk: Buffer;
+              let voiceBuffer: Buffer;
               if (this.qqClient instanceof NapCatClient) {
                 const ret = await this.qqClient.callApi('download_file', { url });
-                bufSilk = await fsP.readFile(ret.file);
-                fsP.unlink(ret.file);
+                voiceBuffer = await fsP.readFile(ret.file);
+                await fsP.unlink(ret.file).catch(() => undefined);
               }
               else {
-                bufSilk = await fetchFile(url);
+                voiceBuffer = await fetchFile(url);
               }
               const temp = await createTempFile({ postfix: '.ogg' });
               tempFiles.push(temp);
-              await silk.decode(bufSilk, temp.path);
+              await silk.decodeVoice(voiceBuffer, temp.path);
               files.push(temp.path);
             }
             else {

@@ -114,23 +114,23 @@ const saveFromUrl = async (uuid: string, cacheKey: string, url: string, fallback
   return await writeBuffer(uuid, cacheKey, buffer, fallbackExt);
 };
 
-const writeSilkAsOgg = async (uuid: string, cacheKey: string, buffer: Buffer) => {
+const writeVoiceAsOgg = async (uuid: string, cacheKey: string, buffer: Buffer) => {
   await fsP.mkdir(forwardDir(uuid), { recursive: true });
   const filename = `${md5Hex(cacheKey)}.ogg`;
   const filePath = path.join(forwardDir(uuid), filename);
-  await silk.decode(buffer, filePath);
+  await silk.decodeVoice(buffer, filePath);
   return filename;
 };
 
-const saveSilkUrlAsOgg = async (uuid: string, cacheKey: string, url: string) => {
+const saveVoiceUrlAsOgg = async (uuid: string, cacheKey: string, url: string) => {
   const buffer = await fetchFile(url);
-  return await writeSilkAsOgg(uuid, cacheKey, buffer);
+  return await writeVoiceAsOgg(uuid, cacheKey, buffer);
 };
 
-const copySilkAsOgg = async (uuid: string, cacheKey: string, sourcePath: string) => {
+const copyVoiceAsOgg = async (uuid: string, cacheKey: string, sourcePath: string) => {
   sourcePath = sourcePath.replace(/^file:\/\//, '');
   const buffer = await fsP.readFile(sourcePath);
-  return await writeSilkAsOgg(uuid, cacheKey, buffer);
+  return await writeVoiceAsOgg(uuid, cacheKey, buffer);
 };
 
 export const downloadForwardMedia = async (uuid: string, messages: CachedForwardMessage[], indexPath: number[], qq: QQEntity) => {
@@ -178,7 +178,7 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
     case 'record': {
       const url = elem.url || (typeof elem.file === 'string' ? elem.file : '');
       if (!url) throw new Error('语音下载地址为空');
-      filename = /^https?:\/\//.test(url) ? await saveSilkUrlAsOgg(uuid, cacheKey, url) : await copySilkAsOgg(uuid, cacheKey, url);
+      filename = /^https?:\/\//.test(url) ? await saveVoiceUrlAsOgg(uuid, cacheKey, url) : await copyVoiceAsOgg(uuid, cacheKey, url);
       break;
     }
     case 'file': {
