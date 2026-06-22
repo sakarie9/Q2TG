@@ -26,16 +26,27 @@ let app = new Elysia()
     }),
   })
   .post('/Q2tgServlet/DownloadForwardMultipleMediaApi', async ({ body }) => {
-    // @ts-ignore
-    const uuid = body.uuid;
+    const requestBody = body as { uuid: string; path: number[] };
+    const uuid = requestBody.uuid;
+    const indexPath = requestBody.path;
     const messages = await loadForwardMessages(uuid);
     const data = await db.forwardMultiple.findFirst({
       where: { id: uuid },
     });
     if (!data) throw new Error('消息记录不存在');
     const pair = Pair.getByDbId(data.fromPairId);
-    // @ts-ignore
-    const elem = await downloadForwardMedia(uuid, messages, body.path, pair.qq);
+    let elem: CachedForwardMessage['message'][number];
+    try {
+      elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq);
+    }
+    catch (e) {
+      // Video URLs in forwarded messages can expire. Refresh the forward record once and retry.
+      await refreshForwardMedia(uuid, messages, indexPath, data.resId, data.fileName || undefined, data.fromPairId);
+      elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq).catch((retryError) => {
+        const message = retryError instanceof Error ? retryError.message : String(retryError);
+        throw new Error(`保存媒体失败：${message}`);
+      });
+    }
     await saveForwardMessages(uuid, messages);
     return elem;
   }, {
@@ -96,6 +107,29 @@ const saveForwardMessages = async (uuid: string, messages: CachedForwardMessage[
     data: { cachedMessages: JSON.parse(JSON.stringify(messages)) },
   });
   forwardCache.set(uuid, messages);
+};
+
+const refreshForwardMedia = async (
+  uuid: string,
+  messages: CachedForwardMessage[],
+  indexPath: number[],
+  resId: string,
+  fileName: string | undefined,
+  fromPairId: number,
+) => {
+  const [messageIndex, elemIndex] = indexPath;
+  const pair = Pair.getByDbId(fromPairId);
+  const freshMessages = await pair.qq.getForwardMsg(resId, fileName);
+  await processNestedForward(freshMessages, fromPairId);
+  const freshCachedMessages = prepareForwardMessages(freshMessages, uuid);
+  const freshElem = freshCachedMessages[messageIndex]?.message?.[elemIndex];
+  if (!freshElem) throw new Error('刷新媒体地址失败：消息元素不存在');
+  messages[messageIndex].message[elemIndex] = {
+    ...freshElem,
+    localUrl: messages[messageIndex].message[elemIndex].localUrl,
+    downloadStatus: messages[messageIndex].message[elemIndex].downloadStatus,
+    downloadName: messages[messageIndex].message[elemIndex].downloadName,
+  };
 };
 
 export default app;
