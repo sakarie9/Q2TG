@@ -52,24 +52,29 @@ export default defineComponent({
       currentPage.value.cached = isCached;
     });
 
-    const loadPage = async (page: ForwardPage, opened = true) => {
+    const updatePage = (uuid: string, patch: Partial<ForwardPage>) => {
+      stack.value = stack.value.map(page => page.uuid === uuid ? { ...page, ...patch } : page);
+    };
+
+    const loadPage = async (uuid: string, opened = true) => {
       try {
-        page.loading = true;
-        page.error = '';
+        updatePage(uuid, { loading: true, error: '' });
         const result = await withTimeout(
-          client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid: page.uuid, opened }),
+          client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid, opened }),
           30000,
           '加载超时，请重新打开页面',
         );
-        page.messages = result.data?.messages || null;
-        page.cached = Boolean(result.data?.cached);
-        page.error = result.error?.value?.message || result.error?.message || '';
+        updatePage(uuid, {
+          messages: result.data?.messages || null,
+          cached: Boolean(result.data?.cached),
+          error: result.error?.value?.message || result.error?.message || '',
+        });
       }
       catch (e: any) {
-        page.error = e.message || String(e);
+        updatePage(uuid, { error: e.message || String(e) });
       }
       finally {
-        page.loading = false;
+        updatePage(uuid, { loading: false });
       }
     };
 
@@ -85,7 +90,7 @@ export default defineComponent({
       const params = new URLSearchParams(location.value.search);
       setForwardUuid(params, uuid);
       history.replaceState(null, '', `${location.value.pathname}?${params.toString()}${location.value.hash || ''}`);
-      await loadPage(nextPage);
+      await loadPage(uuid);
     };
 
     const goBack = () => {
@@ -126,7 +131,7 @@ export default defineComponent({
       if (stack.value[0]?.uuid === initialUuid.value) return;
       const page: ForwardPage = { uuid: initialUuid.value, messages: null, cached: false, loading: true, error: '' };
       stack.value = [page];
-      await loadPage(page);
+      await loadPage(page.uuid);
     });
 
     return () => {
