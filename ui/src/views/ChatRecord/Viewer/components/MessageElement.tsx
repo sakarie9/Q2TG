@@ -2,7 +2,7 @@ import { defineComponent, inject, ref, type PropType } from 'vue';
 import type { MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
-import { NButton, NImage, NSpace } from 'naive-ui';
+import { NButton, NCard, NImage, NModal, NSpace } from 'naive-ui';
 import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
 import linkifyStr from 'linkify-string';
@@ -20,6 +20,8 @@ export default defineComponent({
   setup(props) {
     const saving = ref(false);
     const error = ref('');
+    const imageUrlModalVisible = ref(false);
+    const currentImageUrl = ref('');
     const updateForwardMultiple = inject<ForwardMultipleUpdate | undefined>('forwardMultipleUpdate', undefined);
 
     const saveMedia = async () => {
@@ -62,6 +64,19 @@ export default defineComponent({
       {error.value && <div class="text-red-5 text-12px">{error.value}</div>}
     </NSpace>;
 
+    const showImageUrl = (url: string | undefined, event: MouseEvent) => {
+      event.stopPropagation();
+      if (!url) return;
+      currentImageUrl.value = url;
+      imageUrlModalVisible.value = true;
+    };
+
+    const imageLinkModal = () => <NModal v-model:show={imageUrlModalVisible.value}>
+      <NCard class={styles.imageUrlCard} title="图片链接" bordered={false}>
+        <div class={styles.imageUrlText}>{currentImageUrl.value}</div>
+      </NCard>
+    </NModal>;
+
     return () => {
       switch (props.elem.type) {
         case 'text':
@@ -85,13 +100,33 @@ export default defineComponent({
               url = getImageUrlByMd5(md5);
             }
           }
-          return mediaWrap(<NImage
+          return mediaWrap(<>
+            <NImage
               class="mt-4px"
               width={200}
               src={url}
+              previewSrc={url}
               imgProps={{ referrerpolicy: 'no-referrer' }}
-            />,
-          );
+              renderToolbar={({ nodes }) => <>
+                {nodes.rotateCounterclockwise}
+                {nodes.rotateClockwise}
+                {nodes.resizeToOriginalSize}
+                {nodes.zoomOut}
+                {nodes.zoomIn}
+                {nodes.download}
+                <button
+                  class={styles.imageUrlButton}
+                  title="显示图片链接"
+                  type="button"
+                  onClick={(event) => showImageUrl(url, event)}
+                >
+                  URL
+                </button>
+                {nodes.close}
+              </>}
+            />
+            {imageLinkModal()}
+          </>);
         }
         case 'video-loop':
           return <video src={props.elem.url} autoplay muted loop width={200}/>;
