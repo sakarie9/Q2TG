@@ -38,6 +38,12 @@ const configParsed = z.object({
   DISABLE_FILE_UPLOAD_TIP: z.string().transform((v) => ['true', '1', 'yes'].includes(v.toLowerCase())).default('false'),
   IMAGE_SUMMARY: z.string().optional(),
 
+  R2_ENDPOINT: z.string().url().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_PUBLIC_URL: z.string().url().optional(),
+
   LISTEN_PORT: z.string().regex(/^\d+$/).transform(Number).default('8080'),
 
   UI_PATH: z.string().optional(),

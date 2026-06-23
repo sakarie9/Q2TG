@@ -8,6 +8,13 @@ import { fetchFile, getImageUrlByMd5 } from './urls';
 import env from '../models/env';
 import { md5Hex } from './hashing';
 import silk from '../encoding/silk';
+import {
+  buildR2MediaKey,
+  getR2PublicUrl,
+  isR2StorageEnabled,
+  uploadBufferToR2,
+  uploadFileToR2,
+} from './r2Storage';
 
 export type CachedForwardMessage = ForwardMessage & {
   message: CachedMessageElem[];
@@ -18,6 +25,7 @@ export type CachedMessageElem = MessageElem & {
   cacheKey?: string;
   downloadStatus?: 'idle' | 'cached' | 'unsupported';
   downloadName?: string;
+  storage?: 'local' | 'r2';
 };
 
 const cacheRoot = path.join(env.CACHE_DIR, 'forward-multiple');
@@ -36,6 +44,10 @@ const getBufferExt = async (buffer: Buffer, fallback = 'bin') => {
   const type = await fileTypeFromBuffer(buffer).catch(() => undefined);
   return type?.ext || fallback;
 };
+
+const contentTypeByExt = (ext: string) => mime.lookup(ext) || 'application/octet-stream';
+
+const filenameByKey = (cacheKey: string, ext: string) => `${md5Hex(cacheKey)}.${ext}`;
 
 export const buildMediaKey = (elem: MessageElem) => {
   switch (elem.type) {
@@ -73,6 +85,7 @@ const prepareElem = (elem: MessageElem, uuid: string): CachedMessageElem => {
       downloadStatus: 'cached',
       localUrl: publicUrl(uuid, existing),
       downloadName: existing,
+      storage: 'local',
     } as CachedMessageElem;
   }
 
@@ -93,20 +106,43 @@ export const findCachedMedia = (uuid: string, cacheKey: string) => {
 const writeBuffer = async (uuid: string, cacheKey: string, buffer: Buffer, fallbackExt: string) => {
   await fsP.mkdir(forwardDir(uuid), { recursive: true });
   const ext = await getBufferExt(buffer, fallbackExt);
-  const filename = `${md5Hex(cacheKey)}.${ext}`;
+  const filename = filenameByKey(cacheKey, ext);
   const filePath = path.join(forwardDir(uuid), filename);
   await fsP.writeFile(filePath, buffer);
   return filename;
+};
+
+const writeBufferToR2 = async (uuid: string, cacheKey: string, buffer: Buffer, fallbackExt: string) => {
+  const ext = await getBufferExt(buffer, fallbackExt);
+  const filename = filenameByKey(cacheKey, ext);
+  const key = buildR2MediaKey(uuid, filename);
+  await uploadBufferToR2(key, buffer, contentTypeByExt(ext));
+  return {
+    filename,
+    localUrl: getR2PublicUrl(key),
+  };
 };
 
 const copyFile = async (uuid: string, cacheKey: string, sourcePath: string, fallbackExt: string) => {
   await fsP.mkdir(forwardDir(uuid), { recursive: true });
   sourcePath = sourcePath.replace(/^file:\/\//, '');
   const ext = await getFileExt(sourcePath, fallbackExt);
-  const filename = `${md5Hex(cacheKey)}.${ext}`;
+  const filename = filenameByKey(cacheKey, ext);
   const filePath = path.join(forwardDir(uuid), filename);
   await fsP.copyFile(sourcePath, filePath);
   return filename;
+};
+
+const copyFileToR2 = async (uuid: string, cacheKey: string, sourcePath: string, fallbackExt: string) => {
+  sourcePath = sourcePath.replace(/^file:\/\//, '');
+  const ext = await getFileExt(sourcePath, fallbackExt);
+  const filename = filenameByKey(cacheKey, ext);
+  const key = buildR2MediaKey(uuid, filename);
+  await uploadFileToR2(key, sourcePath, contentTypeByExt(ext));
+  return {
+    filename,
+    localUrl: getR2PublicUrl(key),
+  };
 };
 
 const saveFromUrl = async (uuid: string, cacheKey: string, url: string, fallbackExt: string) => {
@@ -114,9 +150,14 @@ const saveFromUrl = async (uuid: string, cacheKey: string, url: string, fallback
   return await writeBuffer(uuid, cacheKey, buffer, fallbackExt);
 };
 
+const saveUrlToR2 = async (uuid: string, cacheKey: string, url: string, fallbackExt: string) => {
+  const buffer = await fetchFile(url);
+  return await writeBufferToR2(uuid, cacheKey, buffer, fallbackExt);
+};
+
 const writeVoiceAsOgg = async (uuid: string, cacheKey: string, buffer: Buffer) => {
   await fsP.mkdir(forwardDir(uuid), { recursive: true });
-  const filename = `${md5Hex(cacheKey)}.ogg`;
+  const filename = filenameByKey(cacheKey, 'ogg');
   const filePath = path.join(forwardDir(uuid), filename);
   await silk.decodeVoice(buffer, filePath);
   return filename;
@@ -144,35 +185,77 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
     elem.localUrl = publicUrl(uuid, existing);
     elem.downloadStatus = 'cached';
     elem.downloadName = existing;
+    elem.storage = 'local';
     return elem;
   }
 
   let filename = '';
+  let localUrl = '';
+  let storage: CachedMessageElem['storage'] = 'local';
+  const useR2 = isR2StorageEnabled() && isR2Cacheable(elem.type);
   switch (elem.type) {
     case 'image':
     case 'flash': {
       if (Buffer.isBuffer(elem.file)) {
-        filename = await writeBuffer(uuid, cacheKey, elem.file, 'jpg');
+        if (useR2) {
+          ({ filename, localUrl } = await writeBufferToR2(uuid, cacheKey, elem.file, 'jpg'));
+          storage = 'r2';
+        }
+        else {
+          filename = await writeBuffer(uuid, cacheKey, elem.file, 'jpg');
+        }
       }
       else if (typeof elem.file === 'string' && /^https?:\/\//.test(elem.file)) {
-        filename = await saveFromUrl(uuid, cacheKey, elem.file, 'jpg');
+        if (useR2) {
+          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, elem.file, 'jpg'));
+          storage = 'r2';
+        }
+        else {
+          filename = await saveFromUrl(uuid, cacheKey, elem.file, 'jpg');
+        }
       }
       else if (typeof elem.file === 'string' && (/^file:\/\//.test(elem.file) || path.isAbsolute(elem.file))) {
-        filename = await copyFile(uuid, cacheKey, elem.file, 'jpg');
+        if (useR2) {
+          ({ filename, localUrl } = await copyFileToR2(uuid, cacheKey, elem.file, 'jpg'));
+          storage = 'r2';
+        }
+        else {
+          filename = await copyFile(uuid, cacheKey, elem.file, 'jpg');
+        }
       }
       else if (elem.url) {
-        filename = await saveFromUrl(uuid, cacheKey, elem.url, 'jpg');
+        if (useR2) {
+          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, elem.url, 'jpg'));
+          storage = 'r2';
+        }
+        else {
+          filename = await saveFromUrl(uuid, cacheKey, elem.url, 'jpg');
+        }
       }
       else if (typeof elem.file === 'string') {
         const md5 = elem.file.substring(0, 32);
-        filename = await saveFromUrl(uuid, cacheKey, getImageUrlByMd5(md5), 'jpg');
+        if (useR2) {
+          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, getImageUrlByMd5(md5), 'jpg'));
+          storage = 'r2';
+        }
+        else {
+          filename = await saveFromUrl(uuid, cacheKey, getImageUrlByMd5(md5), 'jpg');
+        }
       }
       break;
     }
     case 'video': {
       const url = elem.url || (elem.fid ? await qq.getVideoUrl(elem.fid, elem.md5 || '') : typeof elem.file === 'string' ? elem.file : '');
       if (!url) throw new Error('视频下载地址为空');
-      filename = /^https?:\/\//.test(url) ? await saveFromUrl(uuid, cacheKey, url, 'mp4') : await copyFile(uuid, cacheKey, url, 'mp4');
+      if (useR2) {
+        ({ filename, localUrl } = /^https?:\/\//.test(url)
+          ? await saveUrlToR2(uuid, cacheKey, url, 'mp4')
+          : await copyFileToR2(uuid, cacheKey, url, 'mp4'));
+        storage = 'r2';
+      }
+      else {
+        filename = /^https?:\/\//.test(url) ? await saveFromUrl(uuid, cacheKey, url, 'mp4') : await copyFile(uuid, cacheKey, url, 'mp4');
+      }
       break;
     }
     case 'record': {
@@ -189,9 +272,10 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
   }
 
   if (!filename) throw new Error('此媒体没有可下载的文件地址');
-  elem.localUrl = publicUrl(uuid, filename);
+  elem.localUrl = localUrl || publicUrl(uuid, filename);
   elem.downloadStatus = 'cached';
   elem.downloadName = filename;
+  elem.storage = storage;
   return elem;
 };
 
@@ -205,6 +289,9 @@ export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForw
       const cacheKey = buildMediaKey(elem);
       if (!cacheKey) continue;
       const cachedElem = elem as CachedMessageElem;
+      if (cachedElem.storage === 'r2' && cachedElem.cacheKey === cacheKey && cachedElem.localUrl && cachedElem.downloadStatus === 'cached') {
+        continue;
+      }
 
       const existing = findCachedMedia(uuid, cacheKey);
       if (existing) {
@@ -219,6 +306,7 @@ export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForw
           cachedElem.localUrl = localUrl;
           cachedElem.downloadStatus = 'cached';
           cachedElem.downloadName = existing;
+          cachedElem.storage = 'local';
           changed = true;
         }
         continue;
@@ -238,6 +326,9 @@ export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForw
 
   return changed;
 };
+
+const isR2Cacheable = (type: MessageElem['type']) =>
+  type === 'image' || type === 'flash' || type === 'video';
 
 export const getMediaFile = async (uuid: string, filename: string) => {
   const resolved = path.resolve(forwardDir(uuid), filename);

@@ -52,6 +52,7 @@
     "zod": "^3.24.1"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@bogeychan/elysia-polyfills": "^0.6.4",
     "@prisma/client": "6.1.0",
     "canvas": "^3.0.1",
