@@ -5,6 +5,7 @@ import ChatRecord from '@/views/ChatRecord';
 export default createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/viewer', component: ChatRecord },
     {
       path: '/ui', children: [
         { path: '', component: Index },

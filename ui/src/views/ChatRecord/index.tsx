@@ -1,4 +1,4 @@
-import { computed, defineComponent, effect, provide, ref } from 'vue';
+import { computed, defineComponent, onMounted, onUnmounted, provide, ref, watchEffect } from 'vue';
 import styles from './index.module.sass';
 import { useBrowserLocation } from '@vueuse/core';
 import Viewer from './Viewer';
@@ -13,12 +13,34 @@ type ForwardPage = {
   error: string;
 };
 
+type BrowserLocationValue = {
+  search?: string;
+  hash?: string;
+  pathname?: string;
+};
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData?: string;
+        initDataUnsafe?: {
+          start_param?: string;
+          startParam?: string;
+        };
+        ready?: () => void;
+        expand?: () => void;
+      };
+    };
+  }
+}
+
 export default defineComponent({
   setup() {
     const location = useBrowserLocation();
+    const telegramStartParam = ref('');
     const initialUuid = computed(() => {
-      const params = new URLSearchParams(location.value.search);
-      return getForwardUuid(params);
+      return getForwardUuidFromSources(location.value, telegramStartParam.value);
     });
     const stack = ref<ForwardPage[]>([]);
     const currentPage = computed(() => stack.value[stack.value.length - 1]);
@@ -34,13 +56,17 @@ export default defineComponent({
       try {
         page.loading = true;
         page.error = '';
-        const result = await client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid: page.uuid, opened });
+        const result = await withTimeout(
+          client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid: page.uuid, opened }),
+          30000,
+          '加载超时，请重新打开页面',
+        );
         page.messages = result.data?.messages || null;
         page.cached = Boolean(result.data?.cached);
         page.error = result.error?.value?.message || result.error?.message || '';
       }
       catch (e: any) {
-        page.error = e.message;
+        page.error = e.message || String(e);
       }
       finally {
         page.loading = false;
@@ -72,7 +98,27 @@ export default defineComponent({
 
     provide('openForwardMultiple', openForward);
 
-    effect(async () => {
+    const refreshTelegramStartParam = () => {
+      telegramStartParam.value = getTelegramStartParam();
+    };
+    let telegramRefreshTimers: number[] = [];
+
+    onMounted(() => {
+      window.Telegram?.WebApp?.ready?.();
+      window.Telegram?.WebApp?.expand?.();
+      refreshTelegramStartParam();
+      telegramRefreshTimers = [100, 500, 1500].map(delay => window.setTimeout(refreshTelegramStartParam, delay));
+      window.addEventListener('hashchange', refreshTelegramStartParam);
+      window.addEventListener('popstate', refreshTelegramStartParam);
+    });
+
+    onUnmounted(() => {
+      telegramRefreshTimers.forEach(timer => window.clearTimeout(timer));
+      window.removeEventListener('hashchange', refreshTelegramStartParam);
+      window.removeEventListener('popstate', refreshTelegramStartParam);
+    });
+
+    watchEffect(async () => {
       if (!initialUuid.value) {
         stack.value = [{ uuid: '', messages: null, cached: false, loading: false, error: '未指定消息记录 ID' }];
         return;
@@ -121,8 +167,57 @@ const getForwardUuid = (params: URLSearchParams) =>
   || params.get('startapp')
   || params.get('startApp')
   || params.get('start_param')
+  || params.get('startParam')
   || params.get('hash');
+
+const getForwardUuidFromSources = (locationValue: BrowserLocationValue, telegramStartParam: string) => {
+  const candidates = [
+    telegramStartParam,
+    getForwardUuid(new URLSearchParams(locationValue.search || '')),
+    getForwardUuid(new URLSearchParams(window.location.search)),
+    getForwardUuid(getHashParams(locationValue.hash || '')),
+    getForwardUuid(getHashParams(window.location.hash)),
+    getForwardUuidFromTelegramInitData(),
+  ];
+  return candidates.find(isForwardUuid) || candidates.find(Boolean) || '';
+};
+
+const getHashParams = (hash: string) => {
+  const rawHash = hash.replace(/^#/, '').replace(/^\?/, '');
+  const params = new URLSearchParams(rawHash);
+  const webAppData = params.get('tgWebAppData');
+  if (webAppData) {
+    const nestedParams = new URLSearchParams(webAppData);
+    for (const [key, value] of nestedParams) params.set(key, value);
+  }
+  return params;
+};
+
+const getTelegramStartParam = () =>
+  window.Telegram?.WebApp?.initDataUnsafe?.start_param
+  || window.Telegram?.WebApp?.initDataUnsafe?.startParam
+  || getForwardUuidFromTelegramInitData()
+  || '';
+
+const getForwardUuidFromTelegramInitData = () =>
+  getForwardUuid(new URLSearchParams(window.Telegram?.WebApp?.initData || '')) || '';
+
+const isForwardUuid = (value?: string | null) =>
+  Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 
 const setForwardUuid = (params: URLSearchParams, uuid: string) => {
   params.set(params.has('startapp') ? 'startapp' : 'tgWebAppStartParam', uuid);
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string) => {
+  let timer: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  }
+  finally {
+    if (timer) window.clearTimeout(timer);
+  }
 };
