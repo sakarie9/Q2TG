@@ -8,13 +8,15 @@ import {
   cacheForwardInlineMedia,
   downloadForwardMedia,
   getElemByPath,
+  getImageDownloadSources,
   getMediaFile,
   prepareForwardMessages,
 } from '../../utils/forwardMultipleCache';
+import type { ImageDownloadSource } from '../../utils/forwardMultipleCache';
 import fs from 'fs';
 import mime from 'mime-types';
 import { fileTypeFromBuffer } from 'file-type';
-import { fetchFile, getImageUrlByMd5 } from '../../utils/urls';
+import { fetchFile } from '../../utils/urls';
 
 const forwardCache = new Map<string, any>();
 
@@ -92,10 +94,7 @@ let app = new Elysia()
       return fs.createReadStream(file.path);
     }
 
-    const sourceUrl = resolveImageSourceUrl(imageElem);
-    if (!sourceUrl) throw new Error('图片下载地址为空');
-
-    const buffer = await fetchFile(sourceUrl);
+    const buffer = await fetchImageFromSources(getImageDownloadSources(imageElem));
     const detectedType = await fileTypeFromBuffer(buffer).catch(() => undefined);
     const filename = ensureFilenameExt(fallbackFilename, detectedType?.ext);
     set.headers['content-type'] = detectedType?.mime || mime.lookup(filename) || 'application/octet-stream';
@@ -213,16 +212,20 @@ const getLocalMediaFilenameFromUrl = (uuid: string, url?: string) => {
   }
 };
 
-const resolveImageSourceUrl = (elem: CachedImageElem) => {
-  if (/^https?:\/\//i.test(elem.localUrl || '')) return elem.localUrl || '';
-  if (/^https?:\/\//i.test(elem.url || '')) return elem.url || '';
-  if (typeof elem.file === 'string') {
-    if (/^https?:\/\//i.test(elem.file)) return elem.file;
-    const md5 = elem.file.substring(0, 32);
-    if (/^[a-f\d]{32}$/i.test(md5)) return getImageUrlByMd5(md5);
+const fetchImageFromSources = async (sources: ImageDownloadSource[]) => {
+  let lastError: unknown;
+  for (const source of sources) {
+    try {
+      if (source.type === 'buffer') return source.data;
+      if (source.type === 'file') return await fs.promises.readFile(source.path.replace(/^file:\/\//, ''));
+      return await fetchFile(source.url);
+    }
+    catch (e) {
+      lastError = e;
+    }
   }
-  const md5 = typeof elem.md5 === 'string' ? elem.md5 : Buffer.isBuffer(elem.md5) ? elem.md5.toString('hex') : '';
-  return /^[a-f\d]{32}$/i.test(md5) ? getImageUrlByMd5(md5) : '';
+  const message = lastError instanceof Error ? lastError.message : String(lastError || '无可用下载源');
+  throw new Error(`图片下载失败：${message}`);
 };
 
 const ensureFilenameExt = (filename: string, ext?: string) => {

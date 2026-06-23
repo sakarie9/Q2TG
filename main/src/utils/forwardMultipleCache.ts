@@ -28,6 +28,13 @@ export type CachedMessageElem = MessageElem & {
   storage?: 'local' | 'r2';
 };
 
+export type ImageDownloadSource =
+  | { type: 'buffer'; data: Buffer; fallbackExt: string }
+  | { type: 'url'; url: string; fallbackExt: string }
+  | { type: 'file'; path: string; fallbackExt: string };
+
+type ImageMessageElem = Extract<MessageElem, { type: 'image' | 'flash' }>;
+
 const cacheRoot = path.join(env.CACHE_DIR, 'forward-multiple');
 
 const forwardDir = (uuid: string) => path.join(cacheRoot, uuid);
@@ -196,52 +203,7 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
   switch (elem.type) {
     case 'image':
     case 'flash': {
-      if (Buffer.isBuffer(elem.file)) {
-        if (useR2) {
-          ({ filename, localUrl } = await writeBufferToR2(uuid, cacheKey, elem.file, 'jpg'));
-          storage = 'r2';
-        }
-        else {
-          filename = await writeBuffer(uuid, cacheKey, elem.file, 'jpg');
-        }
-      }
-      else if (typeof elem.file === 'string' && /^https?:\/\//.test(elem.file)) {
-        if (useR2) {
-          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, elem.file, 'jpg'));
-          storage = 'r2';
-        }
-        else {
-          filename = await saveFromUrl(uuid, cacheKey, elem.file, 'jpg');
-        }
-      }
-      else if (typeof elem.file === 'string' && (/^file:\/\//.test(elem.file) || path.isAbsolute(elem.file))) {
-        if (useR2) {
-          ({ filename, localUrl } = await copyFileToR2(uuid, cacheKey, elem.file, 'jpg'));
-          storage = 'r2';
-        }
-        else {
-          filename = await copyFile(uuid, cacheKey, elem.file, 'jpg');
-        }
-      }
-      else if (elem.url) {
-        if (useR2) {
-          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, elem.url, 'jpg'));
-          storage = 'r2';
-        }
-        else {
-          filename = await saveFromUrl(uuid, cacheKey, elem.url, 'jpg');
-        }
-      }
-      else if (typeof elem.file === 'string') {
-        const md5 = elem.file.substring(0, 32);
-        if (useR2) {
-          ({ filename, localUrl } = await saveUrlToR2(uuid, cacheKey, getImageUrlByMd5(md5), 'jpg'));
-          storage = 'r2';
-        }
-        else {
-          filename = await saveFromUrl(uuid, cacheKey, getImageUrlByMd5(md5), 'jpg');
-        }
-      }
+      ({ filename, localUrl, storage } = await saveImageFromSources(uuid, cacheKey, getImageDownloadSources(elem), useR2));
       break;
     }
     case 'video': {
@@ -329,6 +291,74 @@ export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForw
 
 const isR2Cacheable = (type: MessageElem['type']) =>
   type === 'image' || type === 'flash' || type === 'video';
+
+const saveImageFromSources = async (uuid: string, cacheKey: string, sources: ImageDownloadSource[], useR2: boolean) => {
+  let lastError: unknown;
+  for (const source of sources) {
+    try {
+      if (source.type === 'buffer') {
+        if (useR2) {
+          const result = await writeBufferToR2(uuid, cacheKey, source.data, source.fallbackExt);
+          return { ...result, storage: 'r2' as const };
+        }
+        return { filename: await writeBuffer(uuid, cacheKey, source.data, source.fallbackExt), localUrl: '', storage: 'local' as const };
+      }
+      if (source.type === 'file') {
+        if (useR2) {
+          const result = await copyFileToR2(uuid, cacheKey, source.path, source.fallbackExt);
+          return { ...result, storage: 'r2' as const };
+        }
+        return { filename: await copyFile(uuid, cacheKey, source.path, source.fallbackExt), localUrl: '', storage: 'local' as const };
+      }
+      if (useR2) {
+        const result = await saveUrlToR2(uuid, cacheKey, source.url, source.fallbackExt);
+        return { ...result, storage: 'r2' as const };
+      }
+      return { filename: await saveFromUrl(uuid, cacheKey, source.url, source.fallbackExt), localUrl: '', storage: 'local' as const };
+    }
+    catch (e) {
+      lastError = e;
+    }
+  }
+  const message = lastError instanceof Error ? lastError.message : String(lastError || '无可用下载源');
+  throw new Error(`图片下载失败：${message}`);
+};
+
+export const getImageDownloadSources = (elem: ImageMessageElem) => {
+  const sources: ImageDownloadSource[] = [];
+  const seen = new Set<string>();
+  const pushUrl = (url: string | undefined, fallbackExt = 'jpg') => {
+    if (!url || seen.has(`url:${url}`)) return;
+    seen.add(`url:${url}`);
+    sources.push({ type: 'url', url, fallbackExt });
+  };
+  const pushFile = (filePath: string | undefined, fallbackExt = 'jpg') => {
+    if (!filePath || seen.has(`file:${filePath}`)) return;
+    seen.add(`file:${filePath}`);
+    sources.push({ type: 'file', path: filePath, fallbackExt });
+  };
+  const pushMd5 = (md5: string) => {
+    if (/^[a-f\d]{32}$/i.test(md5)) {
+      pushUrl(getImageUrlByMd5(md5));
+    }
+  };
+  if (Buffer.isBuffer(elem.file)) {
+    sources.push({ type: 'buffer', data: elem.file, fallbackExt: 'jpg' });
+  }
+  if (typeof elem.file === 'string' && /^https?:\/\//.test(elem.file)) {
+    pushUrl(elem.file);
+  }
+  if (typeof elem.file === 'string' && (/^file:\/\//.test(elem.file) || path.isAbsolute(elem.file))) {
+    pushFile(elem.file);
+  }
+  pushUrl(elem.url);
+  if (typeof elem.file === 'string') {
+    pushMd5(elem.file.substring(0, 32));
+  }
+  const md5 = typeof elem.md5 === 'string' ? elem.md5 : Buffer.isBuffer(elem.md5) ? elem.md5.toString('hex') : '';
+  pushMd5(md5);
+  return sources;
+};
 
 export const getMediaFile = async (uuid: string, filename: string) => {
   const resolved = path.resolve(forwardDir(uuid), filename);
