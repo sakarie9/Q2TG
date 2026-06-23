@@ -37,6 +37,7 @@ import nameColor from '../constants/nameColor';
 import memberRoleCache from '../helpers/memberRoleCache';
 import path from 'path';
 import { fileTypeFromFile } from 'file-type';
+import { createVideoForwardMedia } from '../helpers/videoForwardHelper';
 
 const NOT_CHAINABLE_ELEMENTS = ['flash', 'record', 'video', 'location', 'share', 'json', 'xml', 'poke'];
 const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/apng', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif', 'image/heic', 'image/heif'];
@@ -301,10 +302,61 @@ export default class ForwardService {
             break;
           }
           case 'video':
-            // 先获取 URL，要传给下面
             if (!(elem as any).url) {
               url = await pair.qq.getVideoUrl(elem.fid, elem.md5);
             }
+            if ('url' in elem)
+              url = elem.url;
+            if (!url && typeof elem.file === 'string') {
+              url = elem.file;
+            }
+            if (!url) {
+              this.log.warn('视频下载地址为空', elem);
+              message += '<i>[视频]</i>';
+              break;
+            }
+            const videoSourceUrl = url;
+            if (this.qqClient instanceof NapCatClient && url && !url.startsWith('http')) {
+              const ret = await this.qqClient.callApi('download_file', { url: 'file://' + url });
+              url = ret.file;
+              tempFiles.push({
+                path: url,
+                fd: 0,
+                cleanup: () => fsP.unlink(url),
+              });
+            }
+            try {
+              const media = await createVideoForwardMedia(url);
+              tempFiles.push(...media.tempFiles);
+              const upload = await pair.tg.parent.uploadFile({
+                file: media.file,
+                workers: 2,
+              });
+              const thumb = media.thumb ? await pair.tg.parent.uploadFile({
+                file: new CustomFile(path.basename(media.thumb), (await fsP.stat(media.thumb)).size, media.thumb),
+                workers: 1,
+              }) : undefined;
+              files.push(new Api.InputMediaUploadedDocument({
+                file: upload,
+                thumb,
+                mimeType: media.mimeType,
+                attributes: media.attributes,
+              }));
+              if (/^https?:\/\//i.test(videoSourceUrl)) {
+                buttons.push(Button.url('🎬 查看视频', videoSourceUrl));
+              }
+            }
+            catch (e) {
+              this.log.error('处理视频失败', e);
+              posthog.capture('处理视频失败', { error: e });
+              if (/^https?:\/\//i.test(videoSourceUrl)) {
+                files.push(videoSourceUrl);
+              }
+              else {
+                message += '<i>[视频]</i>';
+              }
+            }
+            break;
           case 'image':
             if ('url' in elem)
               url = elem.url;
