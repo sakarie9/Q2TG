@@ -109,7 +109,7 @@ export type ImageElemEx = ImageElem & {
   brief?: string,
 }
 
-export const napCatReceiveToMessageElem = (data: Receive[keyof Receive]): MessageElem | NapCatForwardElem | FaceElemEx => {
+export const napCatReceiveToMessageElem = (data: Receive[keyof Receive] | any): MessageElem | NapCatForwardElem | FaceElemEx => {
   switch (data.type) {
     case 'text':
     case 'face':
@@ -122,6 +122,19 @@ export const napCatReceiveToMessageElem = (data: Receive[keyof Receive]): Messag
         type: data.type,
         asface: 'sub_type' in data.data && parseInt(String(data.data.sub_type)) > 0,
       } as any;
+    case 'xml':
+      return {
+        type: 'xml',
+        data: data.data?.data || data.data?.xml || data.data?.content || '',
+      };
+    case 'redbag':
+    case 'red_packet':
+    case 'hongbao':
+    case 'gift':
+      return {
+        type: 'text',
+        text: buildRedPacketText(data),
+      };
     // @ts-ignore
     case 'mface':
       return {
@@ -170,8 +183,33 @@ export const napCatReceiveToMessageElem = (data: Receive[keyof Receive]): Messag
         id: data.data.id,
       };
     default:
-      throw new Error('不支持此元素');
+      return {
+        type: 'text',
+        text: buildUnsupportedSegmentText(data),
+      };
   }
+};
+
+export const napCatReceiveToMessageElems = (segments: Array<Receive[keyof Receive] | any> | undefined, rawMessage = '') => {
+  const messages = (segments || [])
+    .map(segment => {
+      try {
+        return napCatReceiveToMessageElem(segment);
+      }
+      catch {
+        return {
+          type: 'text',
+          text: buildUnsupportedSegmentText(segment),
+        } as MessageElem;
+      }
+    });
+  if (!messages.length && rawMessage.trim()) {
+    messages.push({
+      type: 'text',
+      text: rawMessage.trim(),
+    });
+  }
+  return messages;
 };
 
 export const napCatForwardMultiple = (messages: WSSendReturn['get_forward_msg']['messages']): ForwardMessage[] => messages.map(it => ({
@@ -181,5 +219,56 @@ export const napCatForwardMultiple = (messages: WSSendReturn['get_forward_msg'][
   user_id: it.sender.user_id,
   seq: it.message_id,
   raw_message: it.raw_message,
-  message: ((it as any).content || (it as any).message).map(napCatReceiveToMessageElem),
+  message: napCatReceiveToMessageElems((it as any).content || (it as any).message, it.raw_message),
 }));
+
+const buildRedPacketText = (segment: any) => {
+  const text = pickSegmentText(segment?.data);
+  if (!text) return '[QQ红包]';
+  if (/红包/.test(text)) return text;
+  return `[QQ红包] ${text}`;
+};
+
+const buildUnsupportedSegmentText = (segment: any) => {
+  if (isRedPacketSegment(segment)) return buildRedPacketText(segment);
+  const text = pickSegmentText(segment?.data);
+  if (text) return text;
+  return `[QQ消息: ${String(segment?.type || 'unknown')}]`;
+};
+
+const isRedPacketSegment = (segment: any) =>
+  /red.?bag|red.?packet|hong.?bao|红包|qwallet/i.test(`${segment?.type || ''} ${safeStringify(segment?.data)}`);
+
+const pickSegmentText = (data: any): string => {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const text = pickSegmentText(item);
+      if (text) return text;
+    }
+    return '';
+  }
+  for (const key of ['text', 'content', 'title', 'prompt', 'summary', 'brief', 'name', 'desc', 'description', 'alt', 'message']) {
+    const value = data[key];
+    const text = pickSegmentText(value);
+    if (text) return text;
+  }
+  if (typeof data === 'object') {
+    for (const [key, value] of Object.entries(data)) {
+      if (['app', 'view', 'ver', 'config', 'extra', 'sourceAd'].includes(key)) continue;
+      const text = pickSegmentText(value);
+      if (text) return text;
+    }
+  }
+  return '';
+};
+
+const safeStringify = (value: any) => {
+  try {
+    return JSON.stringify(value);
+  }
+  catch {
+    return '';
+  }
+};

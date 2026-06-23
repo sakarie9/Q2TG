@@ -4,7 +4,7 @@ import { getLogger, Logger } from 'log4js';
 import posthog from '../../models/posthog';
 import type { Receive, WSReceiveHandler, WSSendParam, WSSendReturn } from 'node-napcat-ts';
 import { NapCatFriend, NapCatGroup } from './entity';
-import { napCatReceiveToMessageElem } from './convert';
+import { napCatReceiveToMessageElems } from './convert';
 import { NapCatFriendRequestEvent, NapCatGroupEvent, NapCatGroupInviteEvent } from './event';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
@@ -112,13 +112,13 @@ export class NapCatClient extends QQClient {
     const event = new MessageEvent(
       { id: data.sender.user_id, card: data.sender.card, nickname: data.sender.nickname, name: data.sender.card || data.sender.nickname },
       chat,
-      message.map(napCatReceiveToMessageElem),
+      napCatReceiveToMessageElems(message, data.raw_message),
       data.message_id,
       0, 0,
       data.time,
       data.raw_message,
       replyMessage ? {
-        message: (replyMessage as any).message.filter(it => it.type !== 'reply').map(napCatReceiveToMessageElem),
+        message: napCatReceiveToMessageElems((replyMessage as any).message.filter(it => it.type !== 'reply'), replyMessage.raw_message),
         rand: 0, fromId: replyMessage.sender.user_id, seq: replyMessage.message_id, time: replyMessage.time,
       } : undefined,
       undefined,

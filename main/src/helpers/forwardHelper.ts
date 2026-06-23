@@ -25,6 +25,38 @@ const htmlEscape = (text: string) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+const isRedPacketJson = (jsonObj: any, raw: string) =>
+  /qwallet|red.?bag|red.?packet|hong.?bao|红包/i.test(`${jsonObj?.app || ''} ${raw}`);
+
+const getCardText = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = getCardText(item);
+      if (text) return text;
+    }
+    return '';
+  }
+  if (typeof value !== 'object') return '';
+  for (const key of ['prompt', 'title', 'text', 'content', 'desc', 'description', 'summary', 'name', 'brief']) {
+    const text = getCardText(value[key]);
+    if (text) return text;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (['app', 'view', 'ver', 'config', 'extra', 'sourceAd'].includes(key)) continue;
+    const text = getCardText(nested);
+    if (text) return text;
+  }
+  return '';
+};
+
+const formatRedPacketText = (text: string) => {
+  text = text.trim();
+  if (!text) return '[QQ红包]';
+  return /红包/.test(text) ? text : `[QQ红包] ${text}`;
+};
+
 const bufferOrPathCustomFile = (filename: string, bufferOrPath: Buffer | string) => {
   if (!bufferOrPath) throw new Error('[bufferOrPathCustomFile] bufferOrPath is empty');
   const isBuffer = Buffer.isBuffer(bufferOrPath);
@@ -87,6 +119,9 @@ export default {
 
   processJson(json: string) {
     const jsonObj = JSON.parse(json);
+    if (isRedPacketJson(jsonObj, json)) {
+      return { type: 'text', text: formatRedPacketText(getCardText(jsonObj)) };
+    }
     if (jsonObj.app === 'com.tencent.mannounce') {
       try {
         const title = base64decode(jsonObj.meta.mannounce.title);

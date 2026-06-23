@@ -517,8 +517,11 @@ export default class ForwardService {
       }
       this.crhPlayerInfo.delete(pair);
       message = message.trim();
-      if (!event.message.length) {
-        message += '<i>[消息无法解析出内容]</i>';
+      if (!message && !files.length && event.brief?.trim()) {
+        message = helper.htmlEscape(event.brief.trim());
+      }
+      if (!message && !files.length) {
+        message = '<i>[消息无法解析出内容]</i>';
       }
 
       // 处理回复
