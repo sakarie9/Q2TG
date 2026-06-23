@@ -19,6 +19,7 @@ export default defineComponent({
   },
   setup(props) {
     const saving = ref(false);
+    const imageDownloading = ref(false);
     const error = ref('');
     const imageUrlModalVisible = ref(false);
     const currentImageUrl = ref('');
@@ -71,6 +72,53 @@ export default defineComponent({
       imageUrlModalVisible.value = true;
     };
 
+    const imageDownloadUrl = () =>
+      `/Q2tgServlet/ForwardMultipleMediaDownload/${encodeURIComponent(props.uuid)}/${props.path[0]}/${props.path[1]}`;
+
+    const downloadImage = async (event: MouseEvent) => {
+      event.stopPropagation();
+      if (imageDownloading.value) return;
+      imageDownloading.value = true;
+      error.value = '';
+      try {
+        const response = await fetch(imageDownloadUrl());
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = getFilenameFromDisposition(response.headers.get('content-disposition')) || 'image';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+      catch (e: any) {
+        const message = e.message || String(e);
+        error.value = message;
+        window.alert(`下载图片失败：${message}`);
+      }
+      finally {
+        imageDownloading.value = false;
+      }
+    };
+
+    const getFilenameFromDisposition = (disposition: string | null) => {
+      const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      if (encoded) {
+        try {
+          return decodeURIComponent(encoded);
+        }
+        catch {
+          return encoded;
+        }
+      }
+      return disposition?.match(/filename="([^"]+)"/i)?.[1] || '';
+    };
+
     const imageLinkModal = () => <NModal v-model:show={imageUrlModalVisible.value}>
       <NCard class={styles.imageUrlCard} title="图片链接" bordered={false}>
         <div class={styles.imageUrlText}>{currentImageUrl.value}</div>
@@ -113,9 +161,17 @@ export default defineComponent({
                 {nodes.resizeToOriginalSize}
                 {nodes.zoomOut}
                 {nodes.zoomIn}
-                {nodes.download}
                 <button
-                  class={styles.imageUrlButton}
+                  class={styles.imageToolbarButton}
+                  title="下载图片"
+                  type="button"
+                  disabled={imageDownloading.value}
+                  onClick={downloadImage}
+                >
+                  下载
+                </button>
+                <button
+                  class={styles.imageToolbarButton}
                   title="显示图片链接"
                   type="button"
                   onClick={(event) => showImageUrl(url, event)}

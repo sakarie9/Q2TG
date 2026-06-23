@@ -343,7 +343,7 @@ export const getMediaFile = async (uuid: string, filename: string) => {
   };
 };
 
-const getElemByPath = (messages: CachedForwardMessage[], indexPath: number[]) => {
+export const getElemByPath = (messages: CachedForwardMessage[], indexPath: number[]) => {
   if (indexPath.length < 2) return undefined;
   const [messageIndex, elemIndex] = indexPath;
   return messages[messageIndex]?.message?.[elemIndex] as CachedMessageElem | undefined;

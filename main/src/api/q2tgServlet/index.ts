@@ -4,14 +4,21 @@ import { Pair } from '../../models/Pair';
 import processNestedForward from '../../utils/processNestedForward';
 import {
   CachedForwardMessage,
+  CachedMessageElem,
   cacheForwardInlineMedia,
   downloadForwardMedia,
+  getElemByPath,
   getMediaFile,
   prepareForwardMessages,
 } from '../../utils/forwardMultipleCache';
 import fs from 'fs';
+import mime from 'mime-types';
+import { fileTypeFromBuffer } from 'file-type';
+import { fetchFile, getImageUrlByMd5 } from '../../utils/urls';
 
 const forwardCache = new Map<string, any>();
+
+type CachedImageElem = Extract<CachedMessageElem, { type: 'image' | 'flash' }>;
 
 let app = new Elysia()
   .post('/Q2tgServlet/GetForwardMultipleMessageApi', async ({ body }) => {
@@ -64,6 +71,41 @@ let app = new Elysia()
     params: t.Object({
       uuid: t.String({ format: 'uuid' }),
       filename: t.String(),
+    }),
+  })
+  .get('/Q2tgServlet/ForwardMultipleMediaDownload/:uuid/:messageIndex/:elemIndex', async ({ params, set }) => {
+    const uuid = params.uuid;
+    const indexPath = [Number(params.messageIndex), Number(params.elemIndex)];
+    if (indexPath.some(Number.isNaN)) throw new Error('非法媒体路径');
+    const messages = await loadForwardMessages(uuid);
+    const elem = getElemByPath(messages, indexPath);
+    if (!elem) throw new Error('媒体不存在');
+    if (elem.type !== 'image' && elem.type !== 'flash') throw new Error('此消息元素不支持图片下载');
+
+    const imageElem = elem as CachedImageElem;
+    const localFilename = getLocalCachedFilename(uuid, imageElem);
+    const fallbackFilename = localFilename || `${elem.type}-${indexPath.join('-')}.jpg`;
+    if (localFilename && elem.storage !== 'r2') {
+      const file = await getMediaFile(uuid, localFilename);
+      set.headers['content-type'] = file.contentType;
+      set.headers['content-disposition'] = contentDisposition(fallbackFilename);
+      return fs.createReadStream(file.path);
+    }
+
+    const sourceUrl = resolveImageSourceUrl(imageElem);
+    if (!sourceUrl) throw new Error('图片下载地址为空');
+
+    const buffer = await fetchFile(sourceUrl);
+    const detectedType = await fileTypeFromBuffer(buffer).catch(() => undefined);
+    const filename = ensureFilenameExt(fallbackFilename, detectedType?.ext);
+    set.headers['content-type'] = detectedType?.mime || mime.lookup(filename) || 'application/octet-stream';
+    set.headers['content-disposition'] = contentDisposition(filename);
+    return buffer;
+  }, {
+    params: t.Object({
+      uuid: t.String({ format: 'uuid' }),
+      messageIndex: t.Numeric(),
+      elemIndex: t.Numeric(),
     }),
   });
 
@@ -150,5 +192,51 @@ const refreshForwardMedia = async (
     storage: oldElem.storage,
   };
 };
+
+const getLocalCachedFilename = (uuid: string, elem: CachedImageElem) => {
+  const filenameFromUrl = getLocalMediaFilenameFromUrl(uuid, elem.localUrl);
+  if (filenameFromUrl) return filenameFromUrl;
+  if (/^https?:\/\//i.test(elem.localUrl || '')) return '';
+  return elem.storage === 'r2' ? '' : elem.downloadName || '';
+};
+
+const getLocalMediaFilenameFromUrl = (uuid: string, url?: string) => {
+  if (!url) return '';
+  const marker = `/Q2tgServlet/ForwardMultipleMedia/${uuid}/`;
+  try {
+    const { pathname } = new URL(url, 'http://q2tg.local');
+    if (!pathname.startsWith(marker)) return '';
+    return decodeURIComponent(pathname.slice(marker.length));
+  }
+  catch {
+    return '';
+  }
+};
+
+const resolveImageSourceUrl = (elem: CachedImageElem) => {
+  if (/^https?:\/\//i.test(elem.localUrl || '')) return elem.localUrl || '';
+  if (/^https?:\/\//i.test(elem.url || '')) return elem.url || '';
+  if (typeof elem.file === 'string') {
+    if (/^https?:\/\//i.test(elem.file)) return elem.file;
+    const md5 = elem.file.substring(0, 32);
+    if (/^[a-f\d]{32}$/i.test(md5)) return getImageUrlByMd5(md5);
+  }
+  const md5 = typeof elem.md5 === 'string' ? elem.md5 : Buffer.isBuffer(elem.md5) ? elem.md5.toString('hex') : '';
+  return /^[a-f\d]{32}$/i.test(md5) ? getImageUrlByMd5(md5) : '';
+};
+
+const ensureFilenameExt = (filename: string, ext?: string) => {
+  if (!ext || /\.[a-z\d]{1,8}$/i.test(filename)) return filename;
+  return `${filename}.${ext}`;
+};
+
+const contentDisposition = (filename: string) => {
+  const safeFilename = (filename || 'download').replace(/[\r\n"]/g, '_').replace(/[^\x20-\x7e]/g, '_');
+  return `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeRFC5987ValueChars(filename)}`;
+};
+
+const encodeRFC5987ValueChars = (value: string) =>
+  encodeURIComponent(value).replace(/['()*]/g, char =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 
 export default app;

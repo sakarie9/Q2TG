@@ -1,7 +1,7 @@
 .messageContent
   white-space: pre-line
 
-.imageUrlButton
+.imageToolbarButton
   width: 34px
   height: 34px
   border: 0
@@ -17,6 +17,10 @@
 
   &:hover
     background: rgba(255, 255, 255, .12)
+
+  &:disabled
+    cursor: wait
+    opacity: .55
 
 .imageUrlCard
   max-width: min(520px, calc(100vw - 32px))
