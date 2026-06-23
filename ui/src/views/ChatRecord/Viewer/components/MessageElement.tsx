@@ -1,4 +1,4 @@
-import { defineComponent, inject, ref, type PropType } from 'vue';
+import { computed, defineComponent, inject, ref, watch, type PropType } from 'vue';
 import type { MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
@@ -50,10 +50,25 @@ export default defineComponent({
   setup(props) {
     const saving = ref(false);
     const imageDownloading = ref(false);
+    const imageSourceIndex = ref(0);
     const error = ref('');
     const imageUrlModalVisible = ref(false);
     const currentImageUrl = ref('');
     const updateForwardMultiple = inject<ForwardMultipleUpdate | undefined>('forwardMultipleUpdate', undefined);
+    const imageCandidates = computed(() => {
+      if (props.elem.type !== 'image' && props.elem.type !== 'flash') return [];
+      return uniqueUrls([
+        props.elem.localUrl,
+        props.elem.url,
+        typeof props.elem.file === 'string' && /^https?:\/\//i.test(props.elem.file) ? props.elem.file : '',
+        typeof props.elem.file === 'string' ? getImageMd5Url(props.elem.file) : '',
+      ]);
+    });
+    const currentImageSrc = computed(() => imageCandidates.value[imageSourceIndex.value] || '');
+
+    watch(imageCandidates, () => {
+      imageSourceIndex.value = 0;
+    });
 
     const saveMedia = async () => {
       saving.value = true;
@@ -100,6 +115,14 @@ export default defineComponent({
       if (!url) return;
       currentImageUrl.value = url;
       imageUrlModalVisible.value = true;
+    };
+
+    const switchImageSource = () => {
+      if (imageSourceIndex.value < imageCandidates.value.length - 1) {
+        imageSourceIndex.value += 1;
+        return;
+      }
+      imageSourceIndex.value = imageCandidates.value.length;
     };
 
     const imageDownloadUrl = () =>
@@ -168,23 +191,14 @@ export default defineComponent({
           })}></div>;
         case 'image':
         case 'flash': {
-          let url = props.elem.localUrl || props.elem.url;
-          let md5;
-          if (!url && typeof props.elem.file === 'string') {
-            md5 = props.elem.file.substring(0, 32);
-            if (!/([a-f\d]{32}|[A-F\d]{32})/.test(md5))
-              md5 = undefined;
-            if (md5) {
-              url = getImageUrlByMd5(md5);
-            }
-          }
+          const url = currentImageSrc.value;
           return mediaWrap(<>
-            <NImage
+            {url ? <NImage
               class="mt-4px"
               width={200}
               src={url}
               previewSrc={url}
-              imgProps={{ referrerpolicy: 'no-referrer' }}
+              imgProps={{ referrerpolicy: 'no-referrer', onError: switchImageSource }}
               renderToolbar={({ nodes }) => <>
                 {nodes.rotateCounterclockwise}
                 {nodes.rotateClockwise}
@@ -206,13 +220,13 @@ export default defineComponent({
                   title="显示图片链接"
                   type="button"
                   aria-label="显示图片链接"
-                  onClick={(event) => showImageUrl(url, event)}
+                  onClick={(event) => showImageUrl(currentImageSrc.value, event)}
                 >
                   <LinkIcon/>
                 </button>
                 {nodes.close}
               </>}
-            />
+            /> : <div>[图片]</div>}
             {imageLinkModal()}
           </>);
         }
@@ -255,3 +269,17 @@ export default defineComponent({
     };
   },
 });
+
+const getImageMd5Url = (file: string) => {
+  const md5 = file.substring(0, 32);
+  return /^[a-f\d]{32}$/i.test(md5) ? getImageUrlByMd5(md5) : '';
+};
+
+const uniqueUrls = (urls: Array<string | false | undefined>) => {
+  const seen = new Set<string>();
+  return urls.filter((url): url is string => {
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
+};

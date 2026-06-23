@@ -158,9 +158,6 @@ export default defineComponent({
             <span class={styles.cacheCheck}/>
           </div>}
         </div>}
-        {hasNavigation && <div class={styles.layerTitle}>
-          嵌套合并转发
-        </div>}
         <Viewer messages={page.messages} uuid={page.uuid}/>
       </div>;
     };
