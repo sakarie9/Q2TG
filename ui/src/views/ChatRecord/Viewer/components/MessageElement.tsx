@@ -11,6 +11,36 @@ import type { ForwardMessage } from '../types/ForwardMessage';
 
 type ForwardMultipleUpdate = (messages: ForwardMessage[], cached: boolean) => void;
 
+const DownloadIcon = () => <svg
+  class={styles.imageToolbarIcon}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+  <polyline points="7 10 12 15 17 10"/>
+  <line x1="12" y1="15" x2="12" y2="3"/>
+</svg>;
+
+const LinkIcon = () => <svg
+  class={styles.imageToolbarIcon}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+  <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+  <line x1="8" y1="12" x2="16" y2="12"/>
+</svg>;
+
 export default defineComponent({
   props: {
     elem: { required: true, type: Object as PropType<MessageElemExt> },
@@ -165,18 +195,20 @@ export default defineComponent({
                   class={styles.imageToolbarButton}
                   title="下载图片"
                   type="button"
+                  aria-label="下载图片"
                   disabled={imageDownloading.value}
                   onClick={downloadImage}
                 >
-                  下载
+                  <DownloadIcon/>
                 </button>
                 <button
                   class={styles.imageToolbarButton}
                   title="显示图片链接"
                   type="button"
+                  aria-label="显示图片链接"
                   onClick={(event) => showImageUrl(url, event)}
                 >
-                  URL
+                  <LinkIcon/>
                 </button>
                 {nodes.close}
               </>}
