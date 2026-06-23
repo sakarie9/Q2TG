@@ -1,8 +1,12 @@
-import { computed, defineComponent } from 'vue';
+import { computed, defineComponent, inject, ref, watchEffect } from 'vue';
 import type BilibiliMiniApp from '../types/BilibiliMiniApp';
 import type StructMessageCard from '../types/StructMessageCard';
 import { NSpace } from 'naive-ui';
-import { useBrowserLocation } from '@vueuse/core';
+import client from '@/utils/client';
+import type { ForwardMessage } from '../types/ForwardMessage';
+import styles from './MessageElement.module.sass';
+
+type OpenForwardMultiple = (uuid: string) => void | Promise<void>;
 
 export default defineComponent({
   props: {
@@ -10,17 +14,61 @@ export default defineComponent({
   },
   setup(props) {
     const jsonObj = computed(() => JSON.parse(props.json));
-    const location = useBrowserLocation();
+    const openForwardMultiple = inject<OpenForwardMultiple | undefined>('openForwardMultiple', undefined);
+    const previewLoading = ref(false);
+    const previewError = ref('');
+    const previewMessages = ref<ForwardMessage[] | null>(null);
+    let previewRequestId = 0;
 
     const openForward = (uuid: string) => {
-      const params = new URLSearchParams(location.value.search);
-      params.set('tgWebAppStartParam', uuid);
-      location.value.search = params.toString();
+      openForwardMultiple?.(uuid);
     };
+
+    watchEffect(async () => {
+      const uuid = jsonObj.value?.type === 'forward' ? jsonObj.value.uuid : '';
+      const requestId = ++previewRequestId;
+      previewMessages.value = null;
+      previewError.value = '';
+      if (!uuid) return;
+      previewLoading.value = true;
+      try {
+        const result = await client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid, opened: false });
+        if (requestId !== previewRequestId) return;
+        previewMessages.value = result.data?.messages || null;
+        previewError.value = result.error?.value?.message || result.error?.message || '';
+      }
+      catch (e: any) {
+        if (requestId !== previewRequestId) return;
+        previewError.value = e.message;
+      }
+      finally {
+        if (requestId === previewRequestId) previewLoading.value = false;
+      }
+    });
 
     return () => {
       if (jsonObj.value.type === 'forward') {
-        return <div class="c-blue-5 cursor-pointer" onClick={() => openForward(jsonObj.value.uuid)}>[嵌套合并转发消息]</div>;
+        const messages = previewMessages.value || [];
+        const previewItems = buildForwardPreview(messages);
+        return <button class={styles.forwardPreviewCard} type="button" onClick={() => openForward(jsonObj.value.uuid)}>
+          <div class={styles.forwardPreviewHeader}>
+            <span>合并转发</span>
+            <svg class={styles.forwardPreviewIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </div>
+          {previewLoading.value && <div class={styles.forwardPreviewHint}>加载预览中...</div>}
+          {previewError.value && <div class={styles.forwardPreviewHint}>{previewError.value}</div>}
+          {!previewLoading.value && !previewError.value && previewItems.length > 0 && <div class={styles.forwardPreviewList}>
+            {previewItems.map((item, index) => <div class={styles.forwardPreviewItem} key={index}>
+              <span class={styles.forwardPreviewSender}>{item.sender}</span>
+              <span class={styles.forwardPreviewText}>{item.text}</span>
+            </div>)}
+          </div>}
+          {!previewLoading.value && !previewError.value && <div class={styles.forwardPreviewFooter}>
+            共 {messages.length} 条消息
+          </div>}
+        </button>;
       }
       if (jsonObj.value.app === 'com.tencent.mannounce') {
         try {
@@ -73,3 +121,48 @@ export default defineComponent({
     };
   },
 });
+
+const buildForwardPreview = (messages: ForwardMessage[]) =>
+  messages.slice(0, 4).map(message => ({
+    sender: message.nickname || String(message.user_id),
+    text: summarizeMessage(message),
+  })).filter(item => item.text);
+
+const summarizeMessage = (message: ForwardMessage) => {
+  const raw = message.raw_message?.trim();
+  if (raw) return truncate(raw);
+  const parts = message.message.map(elem => {
+    switch (elem.type) {
+      case 'text':
+      case 'at':
+        return elem.text || '';
+      case 'image':
+      case 'flash':
+        return '[图片]';
+      case 'video':
+      case 'video-loop':
+        return '[视频]';
+      case 'record':
+        return '[语音]';
+      case 'file':
+        return `[文件] ${elem.name}`;
+      case 'json':
+        try {
+          const json = JSON.parse(elem.data);
+          return json.type === 'forward' ? '[合并转发]' : '[JSON 卡片]';
+        }
+        catch {
+          return '[JSON 卡片]';
+        }
+      case 'xml':
+        return '[XML 卡片]';
+      case 'location':
+        return `[位置] ${elem.name || elem.address || ''}`;
+      default:
+        return `[${elem.type}]`;
+    }
+  }).filter(Boolean).join(' ');
+  return truncate(parts || '[消息]');
+};
+
+const truncate = (text: string) => text.length > 56 ? `${text.slice(0, 56)}...` : text;

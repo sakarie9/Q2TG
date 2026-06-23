@@ -38,3 +38,69 @@
   user-select: text
   white-space: pre-wrap
   word-break: break-all
+
+.forwardPreviewCard
+  width: min(280px, 100%)
+  border: 1px solid rgba(128, 128, 128, .24)
+  border-radius: 7px
+  background: rgba(128, 128, 128, .08)
+  color: inherit
+  cursor: pointer
+  display: block
+  margin-top: 4px
+  padding: 9px 10px
+  text-align: left
+
+  &:hover
+    background: rgba(128, 128, 128, .13)
+
+.forwardPreviewHeader
+  display: flex
+  align-items: center
+  justify-content: space-between
+  font-size: 14px
+  font-weight: 600
+  margin-bottom: 6px
+
+.forwardPreviewIcon
+  width: 18px
+  height: 18px
+  color: var(--tg-theme-hint-color)
+
+.forwardPreviewList
+  display: grid
+  gap: 3px
+
+.forwardPreviewItem
+  display: flex
+  gap: 6px
+  min-width: 0
+  font-size: 12px
+  line-height: 1.35
+
+.forwardPreviewSender
+  color: var(--tg-theme-hint-color)
+  flex: 0 0 auto
+  max-width: 78px
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+.forwardPreviewText
+  flex: 1
+  min-width: 0
+  overflow: hidden
+  text-overflow: ellipsis
+  white-space: nowrap
+
+.forwardPreviewHint
+  color: var(--tg-theme-hint-color)
+  font-size: 12px
+  line-height: 1.4
+
+.forwardPreviewFooter
+  border-top: 1px solid rgba(128, 128, 128, .18)
+  color: var(--tg-theme-hint-color)
+  font-size: 12px
+  margin-top: 7px
+  padding-top: 6px

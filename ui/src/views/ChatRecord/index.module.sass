@@ -13,11 +13,39 @@
   position: relative
   width: 100%
 
-.cacheBadge
+.withTopBar
+  padding-top: 44px
+
+.topBar
   position: fixed
   top: 12px
+  left: 12px
   right: 12px
   z-index: 10
+  display: flex
+  align-items: center
+  justify-content: space-between
+  pointer-events: none
+
+.backButton
+  height: 32px
+  border: 1px solid rgba(128, 128, 128, .28)
+  border-radius: 6px
+  background: var(--tg-theme-bg-color, #fff)
+  color: var(--tg-theme-text-color, #111)
+  display: inline-flex
+  align-items: center
+  gap: 4px
+  font-size: 13px
+  line-height: 1
+  padding: 0 10px 0 7px
+  pointer-events: auto
+
+.backIcon
+  width: 18px
+  height: 18px
+
+.cacheBadge
   width: 24px
   height: 24px
   border-radius: 50%
@@ -26,6 +54,8 @@
   display: flex
   align-items: center
   justify-content: center
+  margin-left: auto
+  pointer-events: auto
 
 .cacheCheck
   width: 10px
@@ -33,3 +63,8 @@
   border-left: 2px solid #fff
   border-bottom: 2px solid #fff
   transform: rotate(-45deg) translate(1px, -1px)
+
+.layerTitle
+  color: var(--tg-theme-hint-color)
+  font-size: 13px
+  margin: -8px 12px 8px
