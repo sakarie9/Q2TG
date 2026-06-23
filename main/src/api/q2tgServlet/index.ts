@@ -15,14 +15,15 @@ const forwardCache = new Map<string, any>();
 
 let app = new Elysia()
   .post('/Q2tgServlet/GetForwardMultipleMessageApi', async ({ body }) => {
-    // @ts-ignore
-    const uuid = body.uuid;
-    await loadForwardMessages(uuid);
-    return forwardCache.get(uuid);
+    const requestBody = body as { uuid: string; opened?: boolean };
+    const messages = await loadForwardMessages(requestBody.uuid);
+    const cached = requestBody.opened ? await cacheOpenedForwardMessages(requestBody.uuid, messages) : isForwardCached(messages);
+    return { messages, cached };
   }, {
     body: t.Object({
       // 不许注入
       uuid: t.String({ format: 'uuid' }),
+      opened: t.Optional(t.Boolean()),
     }),
   })
   .post('/Q2tgServlet/DownloadForwardMultipleMediaApi', async ({ body }) => {
@@ -47,8 +48,8 @@ let app = new Elysia()
         throw new Error(`保存媒体失败：${message}`);
       });
     }
-    await saveForwardMessages(uuid, messages);
-    return elem;
+    const cached = await cacheOpenedForwardMessages(uuid, messages, data);
+    return { elem, messages, cached };
   }, {
     body: t.Object({
       uuid: t.String({ format: 'uuid' }),
@@ -88,18 +89,34 @@ const loadForwardMessages = async (uuid: string): Promise<CachedForwardMessage[]
       forwardCache.set(uuid, cachedMessages);
     }
 
-    const messages = forwardCache.get(uuid) as CachedForwardMessage[];
-    const pair = Pair.getByDbId(data.fromPairId);
-    if (await cacheForwardInlineMedia(uuid, messages, pair.qq)) {
-      await saveForwardMessages(uuid, messages);
-    }
-
     setTimeout(() => {
       forwardCache.delete(uuid);
     }, 1000 * 60 * 10);
   }
   return forwardCache.get(uuid);
 };
+
+const cacheOpenedForwardMessages = async (
+  uuid: string,
+  messages: CachedForwardMessage[],
+  data?: NonNullable<Awaited<ReturnType<typeof db.forwardMultiple.findFirst>>>,
+) => {
+  data ||= await db.forwardMultiple.findFirst({
+    where: { id: uuid },
+  });
+  if (!data) throw new Error('消息记录不存在');
+  const pair = Pair.getByDbId(data.fromPairId);
+  await cacheForwardInlineMedia(uuid, messages, pair.qq);
+  await saveForwardMessages(uuid, messages);
+  return isForwardCached(messages);
+};
+
+const isForwardCached = (messages: CachedForwardMessage[]) =>
+  messages.every(message => message.message.every(elem => {
+    if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record' && elem.type !== 'video') return true;
+    const cachedElem = elem as CachedForwardMessage['message'][number];
+    return cachedElem.downloadStatus === 'cached' && Boolean(cachedElem.localUrl);
+  }));
 
 const saveForwardMessages = async (uuid: string, messages: CachedForwardMessage[]) => {
   await db.forwardMultiple.update({
@@ -124,11 +141,13 @@ const refreshForwardMedia = async (
   const freshCachedMessages = prepareForwardMessages(freshMessages, uuid);
   const freshElem = freshCachedMessages[messageIndex]?.message?.[elemIndex];
   if (!freshElem) throw new Error('刷新媒体地址失败：消息元素不存在');
+  const oldElem = messages[messageIndex].message[elemIndex];
   messages[messageIndex].message[elemIndex] = {
     ...freshElem,
-    localUrl: messages[messageIndex].message[elemIndex].localUrl,
-    downloadStatus: messages[messageIndex].message[elemIndex].downloadStatus,
-    downloadName: messages[messageIndex].message[elemIndex].downloadName,
+    localUrl: oldElem.localUrl,
+    downloadStatus: oldElem.downloadStatus,
+    downloadName: oldElem.downloadName,
+    storage: oldElem.storage,
   };
 };
 

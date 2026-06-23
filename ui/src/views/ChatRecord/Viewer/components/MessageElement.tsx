@@ -1,4 +1,4 @@
-import { defineComponent, ref, type PropType } from 'vue';
+import { defineComponent, inject, ref, type PropType } from 'vue';
 import type { MessageElemExt } from '../types/MessageElemExt';
 import styles from './MessageElement.module.sass';
 import getImageUrlByMd5 from '../utils/getImageUrlByMd5';
@@ -7,6 +7,9 @@ import JsonElement from './JsonElement';
 import XmlElement from './XmlElement';
 import linkifyStr from 'linkify-string';
 import client from '@/utils/client';
+import type { ForwardMessage } from '../types/ForwardMessage';
+
+type ForwardMultipleUpdate = (messages: ForwardMessage[], cached: boolean) => void;
 
 export default defineComponent({
   props: {
@@ -17,6 +20,7 @@ export default defineComponent({
   setup(props) {
     const saving = ref(false);
     const error = ref('');
+    const updateForwardMultiple = inject<ForwardMultipleUpdate | undefined>('forwardMultipleUpdate', undefined);
 
     const saveMedia = async () => {
       saving.value = true;
@@ -30,7 +34,10 @@ export default defineComponent({
           error.value = result.error.value?.message || result.error.message;
           return;
         }
-        Object.assign(props.elem, result.data);
+        Object.assign(props.elem, result.data.elem);
+        if (result.data.messages) {
+          updateForwardMultiple?.(result.data.messages, Boolean(result.data.cached));
+        }
       }
       catch (e: any) {
         error.value = e.message;
