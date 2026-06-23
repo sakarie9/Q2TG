@@ -18,7 +18,7 @@ export default defineComponent({
     const location = useBrowserLocation();
     const initialUuid = computed(() => {
       const params = new URLSearchParams(location.value.search);
-      return params.get('tgWebAppStartParam');
+      return getForwardUuid(params);
     });
     const stack = ref<ForwardPage[]>([]);
     const currentPage = computed(() => stack.value[stack.value.length - 1]);
@@ -57,7 +57,7 @@ export default defineComponent({
       const nextPage: ForwardPage = { uuid, messages: null, cached: false, loading: true, error: '' };
       stack.value = [...stack.value, nextPage];
       const params = new URLSearchParams(location.value.search);
-      params.set('tgWebAppStartParam', uuid);
+      setForwardUuid(params, uuid);
       history.replaceState(null, '', `${location.value.pathname}?${params.toString()}${location.value.hash || ''}`);
       await loadPage(nextPage);
     };
@@ -66,7 +66,7 @@ export default defineComponent({
       if (stack.value.length <= 1) return;
       stack.value = stack.value.slice(0, -1);
       const params = new URLSearchParams(location.value.search);
-      params.set('tgWebAppStartParam', currentUuid.value);
+      setForwardUuid(params, currentUuid.value);
       history.replaceState(null, '', `${location.value.pathname}?${params.toString()}${location.value.hash || ''}`);
     };
 
@@ -115,3 +115,14 @@ export default defineComponent({
     };
   },
 });
+
+const getForwardUuid = (params: URLSearchParams) =>
+  params.get('tgWebAppStartParam')
+  || params.get('startapp')
+  || params.get('startApp')
+  || params.get('start_param')
+  || params.get('hash');
+
+const setForwardUuid = (params: URLSearchParams, uuid: string) => {
+  params.set(params.has('startapp') ? 'startapp' : 'tgWebAppStartParam', uuid);
+};
