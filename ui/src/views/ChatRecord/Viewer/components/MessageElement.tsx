@@ -52,8 +52,9 @@ export default defineComponent({
     const imageDownloading = ref(false);
     const imageSourceIndex = ref(0);
     const error = ref('');
-    const imageUrlModalVisible = ref(false);
-    const currentImageUrl = ref('');
+    const mediaUrlModalVisible = ref(false);
+    const currentMediaUrl = ref('');
+    const currentMediaUrlTitle = ref('媒体链接');
     const updateForwardMultiple = inject<ForwardMultipleUpdate | undefined>('forwardMultipleUpdate', undefined);
     const imageCandidates = computed(() => {
       if (props.elem.type !== 'image' && props.elem.type !== 'flash') return [];
@@ -65,6 +66,10 @@ export default defineComponent({
       ]);
     });
     const currentImageSrc = computed(() => imageCandidates.value[imageSourceIndex.value] || '');
+    const videoUrl = computed(() => {
+      if (props.elem.type !== 'video') return '';
+      return props.elem.localUrl || props.elem.url || getHttpUrl(props.elem.file) || getHttpUrl(props.elem.fid);
+    });
 
     watch(imageCandidates, () => {
       imageSourceIndex.value = 0;
@@ -83,6 +88,10 @@ export default defineComponent({
           return;
         }
         Object.assign(props.elem, result.data.elem);
+        if (props.elem.type === 'video') {
+          currentMediaUrl.value = videoUrl.value;
+          currentMediaUrlTitle.value = '视频链接';
+        }
         if (result.data.messages) {
           updateForwardMultiple?.(result.data.messages, Boolean(result.data.cached));
         }
@@ -100,7 +109,7 @@ export default defineComponent({
         return null;
       }
       return <NButton class="mt-4px" size="tiny" loading={saving.value} onClick={saveMedia}>
-        保存到服务端
+        保存到服务器
       </NButton>;
     };
 
@@ -110,11 +119,12 @@ export default defineComponent({
       {error.value && <div class="text-red-5 text-12px">{error.value}</div>}
     </NSpace>;
 
-    const showImageUrl = (url: string | undefined, event: MouseEvent) => {
+    const showMediaUrl = (url: string | undefined, title: string, event: MouseEvent) => {
       event.stopPropagation();
       if (!url) return;
-      currentImageUrl.value = url;
-      imageUrlModalVisible.value = true;
+      currentMediaUrl.value = toAbsoluteUrl(url);
+      currentMediaUrlTitle.value = title;
+      mediaUrlModalVisible.value = true;
     };
 
     const switchImageSource = () => {
@@ -172,11 +182,19 @@ export default defineComponent({
       return disposition?.match(/filename="([^"]+)"/i)?.[1] || '';
     };
 
-    const imageLinkModal = () => <NModal v-model:show={imageUrlModalVisible.value}>
-      <NCard class={styles.imageUrlCard} title="图片链接" bordered={false}>
-        <div class={styles.imageUrlText}>{currentImageUrl.value}</div>
+    const mediaLinkModal = () => <NModal v-model:show={mediaUrlModalVisible.value}>
+      <NCard class={styles.imageUrlCard} title={currentMediaUrlTitle.value} bordered={false}>
+        <div class={styles.imageUrlText}>{currentMediaUrl.value}</div>
       </NCard>
     </NModal>;
+
+    const videoLinkButton = () => videoUrl.value ? <NButton
+      class="mt-4px"
+      size="tiny"
+      onClick={(event) => showMediaUrl(videoUrl.value, '视频链接', event)}
+    >
+      显示视频链接
+    </NButton> : null;
 
     return () => {
       switch (props.elem.type) {
@@ -220,14 +238,14 @@ export default defineComponent({
                   title="显示图片链接"
                   type="button"
                   aria-label="显示图片链接"
-                  onClick={(event) => showImageUrl(currentImageSrc.value, event)}
+                  onClick={(event) => showMediaUrl(currentImageSrc.value, '图片链接', event)}
                 >
                   <LinkIcon/>
                 </button>
                 {nodes.close}
               </>}
             /> : <div>[图片]</div>}
-            {imageLinkModal()}
+            {mediaLinkModal()}
           </>);
         }
         case 'video-loop':
@@ -236,9 +254,13 @@ export default defineComponent({
           return <tgs-player autoplay={true} loop={true} mode="normal" src={props.elem.url}
                              style={{ width: 200, height: 200 }}/>;
         case 'video':
-          return mediaWrap(props.elem.localUrl || props.elem.url ?
-            <video src={props.elem.localUrl || props.elem.url} controls width={240}/> :
-            <div>[视频]</div>);
+          return mediaWrap(<>
+            {videoUrl.value ?
+              <video src={videoUrl.value} controls width={240}/> :
+              <div>[视频]</div>}
+            {videoLinkButton()}
+            {mediaLinkModal()}
+          </>);
         case 'record':
           return mediaWrap(props.elem.localUrl ?
             <audio src={props.elem.localUrl} controls/> :
@@ -273,6 +295,18 @@ export default defineComponent({
 const getImageMd5Url = (file: string) => {
   const md5 = file.substring(0, 32);
   return /^[a-f\d]{32}$/i.test(md5) ? getImageUrlByMd5(md5) : '';
+};
+
+const getHttpUrl = (value?: string) =>
+  typeof value === 'string' && /^https?:\/\//i.test(value) ? value : '';
+
+const toAbsoluteUrl = (url: string) => {
+  try {
+    return new URL(url, window.location.href).toString();
+  }
+  catch {
+    return url;
+  }
 };
 
 const uniqueUrls = (urls: Array<string | false | undefined>) => {

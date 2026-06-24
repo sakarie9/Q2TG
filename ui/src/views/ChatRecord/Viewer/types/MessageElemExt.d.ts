@@ -20,6 +20,7 @@ type ImageElem = {
 
 type MediaElem = {
   type: 'video' | 'record'
+  fid?: string
   file?: string
   url?: string
   localUrl?: string

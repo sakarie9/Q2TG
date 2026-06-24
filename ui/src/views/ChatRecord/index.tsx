@@ -45,6 +45,7 @@ export default defineComponent({
     const stack = ref<ForwardPage[]>([]);
     const currentPage = computed(() => stack.value[stack.value.length - 1]);
     const currentUuid = computed(() => currentPage.value?.uuid || '');
+    let cacheRefreshTimer: number | undefined;
 
     provide('forwardMultipleUpdate', (messages: ForwardMessage[], isCached: boolean) => {
       if (!currentPage.value) return;
@@ -75,6 +76,22 @@ export default defineComponent({
       }
       finally {
         updatePage(uuid, { loading: false });
+      }
+    };
+
+    const refreshPageCache = async (uuid: string) => {
+      const page = stack.value.find(item => item.uuid === uuid);
+      if (!page || page.loading || page.cached) return;
+      try {
+        const result = await client.Q2tgServlet.GetForwardMultipleMessageApi.post({ uuid, opened: false });
+        if (!result.data) return;
+        updatePage(uuid, {
+          messages: result.data.messages || page.messages,
+          cached: Boolean(result.data.cached),
+          error: result.error?.value?.message || result.error?.message || page.error,
+        });
+      }
+      catch {
       }
     };
 
@@ -119,8 +136,19 @@ export default defineComponent({
 
     onUnmounted(() => {
       telegramRefreshTimers.forEach(timer => window.clearTimeout(timer));
+      if (cacheRefreshTimer) window.clearInterval(cacheRefreshTimer);
       window.removeEventListener('hashchange', refreshTelegramStartParam);
       window.removeEventListener('popstate', refreshTelegramStartParam);
+    });
+
+    watchEffect(() => {
+      if (cacheRefreshTimer) {
+        window.clearInterval(cacheRefreshTimer);
+        cacheRefreshTimer = undefined;
+      }
+      const page = currentPage.value;
+      if (!page || page.loading || page.cached || !page.messages) return;
+      cacheRefreshTimer = window.setInterval(() => refreshPageCache(page.uuid), 2500);
     });
 
     watchEffect(async () => {

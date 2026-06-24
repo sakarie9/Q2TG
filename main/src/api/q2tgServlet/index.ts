@@ -17,8 +17,11 @@ import fs from 'fs';
 import mime from 'mime-types';
 import { fileTypeFromBuffer } from 'file-type';
 import { fetchFile } from '../../utils/urls';
+import { getLogger } from 'log4js';
 
 const forwardCache = new Map<string, any>();
+const forwardCacheTasks = new Map<string, Promise<void>>();
+const log = getLogger('Q2tgServlet');
 
 type CachedImageElem = Extract<CachedMessageElem, { type: 'image' | 'flash' }>;
 
@@ -26,7 +29,10 @@ let app = new Elysia()
   .post('/Q2tgServlet/GetForwardMultipleMessageApi', async ({ body }) => {
     const requestBody = body as { uuid: string; opened?: boolean };
     const messages = await loadForwardMessages(requestBody.uuid);
-    const cached = requestBody.opened ? await cacheOpenedForwardMessages(requestBody.uuid, messages) : isForwardCached(messages);
+    const cached = isForwardCached(messages);
+    if (requestBody.opened && !cached) {
+      startOpenedForwardCache(requestBody.uuid, messages);
+    }
     return { messages, cached };
   }, {
     body: t.Object({
@@ -57,7 +63,8 @@ let app = new Elysia()
         throw new Error(`保存媒体失败：${message}`);
       });
     }
-    const cached = await cacheOpenedForwardMessages(uuid, messages, data);
+    await saveForwardMessages(uuid, messages);
+    const cached = isForwardCached(messages);
     return { elem, messages, cached };
   }, {
     body: t.Object({
@@ -152,9 +159,22 @@ const cacheOpenedForwardMessages = async (
   return isForwardCached(messages);
 };
 
+const startOpenedForwardCache = (uuid: string, messages: CachedForwardMessage[]) => {
+  if (forwardCacheTasks.has(uuid)) return;
+  const task = cacheOpenedForwardMessages(uuid, messages)
+    .then(() => undefined)
+    .catch(e => {
+      log.warn('后台缓存合并转发媒体失败', uuid, e);
+    })
+    .finally(() => {
+      forwardCacheTasks.delete(uuid);
+    });
+  forwardCacheTasks.set(uuid, task);
+};
+
 const isForwardCached = (messages: CachedForwardMessage[]) =>
   messages.every(message => message.message.every(elem => {
-    if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record' && elem.type !== 'video') return true;
+    if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record') return true;
     const cachedElem = elem as CachedForwardMessage['message'][number];
     return cachedElem.downloadStatus === 'cached' && Boolean(cachedElem.localUrl);
   }));

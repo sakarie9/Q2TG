@@ -247,7 +247,7 @@ export const cacheForwardInlineMedia = async (uuid: string, messages: CachedForw
 
   for (const [messageIndex, message] of messages.entries()) {
     for (const [elemIndex, elem] of message.message.entries()) {
-      if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record' && elem.type !== 'video') continue;
+      if (elem.type !== 'image' && elem.type !== 'flash' && elem.type !== 'record') continue;
       const cacheKey = buildMediaKey(elem);
       if (!cacheKey) continue;
       const cachedElem = elem as CachedMessageElem;
