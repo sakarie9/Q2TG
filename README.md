@@ -7,9 +7,45 @@ QQ 群与 Telegram 群相互转发的 bot
 
 请看 [手册](https://kb.0w.al/文档/Q2TG/安装部署)，[从 V3 更新到 V4](https://kb.0w.al/文档/Q2TG/从%20V3%20更新到%20V4)
 
-v2.x 及以上版本同时需要机器人账号以及登录 Telegram 个人账号，需要自己注册 Telegram API ID，并且还需要配置一些辅助服务。
+v2.x 及以上版本需要 Telegram Bot 账号，并且需要自己注册 Telegram API ID。Telegram UserBot 默认通过二维码登录；如果只使用不依赖 UserBot 的功能，也可以通过 `DISABLE_TG_USERBOT=1` 禁用。
 
-如果你主要使用群组模式并且不想使用个人账号登录 UserBot，可以使用去除 UserBot 的 [Nofated095/Q2TG](https://github.com/Nofated095/Q2TG) 版本。一些功能例如撤回检测将无法使用
+本分支已经移除 icqq 后端，QQ 侧使用 NapCat 连接。Docker 镜像发布到 GitHub Packages：`ghcr.io/qi-mooo/q2tg:sleepyfox`。
+
+## 常用配置
+
+### Telegram UserBot 登录
+
+- `/login` 会智能判断当前掉线的是 QQ 还是 Telegram UserBot：QQ 掉线时重新登录 QQ，UserBot 掉线时重新生成 Telegram 二维码。
+- UserBot 登录失效后不会卡死主程序，只会在 Bot 里提示；可以再次使用 `/login` 获取二维码。
+- 设置 `DISABLE_TG_USERBOT=1` 可以跳过 UserBot 登录。禁用后部分依赖 UserBot 的能力会不可用，例如部分撤回检测、Rich Header 回测、个人模式自动管理等。
+
+### 合并转发网页
+
+合并转发查看器使用 `WEB_ENDPOINT` 对外提供页面，Telegram Mini App 的 `startapp` 链接也支持。页面打开后会缓存消息记录，避免每次重新向 QQ 获取导致链接过期。
+
+- 图片、闪照和语音会在真正打开页面后后台缓存，不阻塞页面首屏。
+- 视频默认只在线播放，不会在打开页面时自动下载到服务器或 R2。
+- 视频只有点击“保存到服务器”后才会下载缓存；配置 R2 时会上传到 R2。
+- 图片预览支持手势操作、下载图片、显示图片链接。
+- 视频支持显示当前视频链接；保存前是在线源地址，保存后是缓存/R2 地址。
+- 嵌套合并转发支持预览和返回上层。
+
+### Cloudflare R2 媒体缓存
+
+配置 R2 后，合并转发里打开后缓存的图片/闪照，以及手动保存的视频，会保存到 R2 并使用 `R2_PUBLIC_URL` 生成公网链接。未配置 R2 时会保存到本地缓存目录。
+
+需要的环境变量：
+
+```env
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com/<bucket>
+# 如果 R2_ENDPOINT 末尾没有 bucket 路径，则需要单独设置 R2_BUCKET
+R2_BUCKET=<bucket>
+R2_ACCESS_KEY_ID=<access-key-id>
+R2_SECRET_ACCESS_KEY=<secret-access-key>
+R2_PUBLIC_URL=https://r2.example.com
+```
+
+不要把真实 `R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、Cloudflare API Token、Telegram Token、数据库密码提交到 GitHub。compose 示例只应保留占位符。
 
 ## 支持的消息类型
 
@@ -24,7 +60,9 @@ v2.x 及以上版本同时需要机器人账号以及登录 Telegram 个人账�
     目前是[转换成 GIF](https://github.com/ed-asriyan/tgs-to-gif) 发送的，并且可能有些[问题](https://github.com/ed-asriyan/tgs-to-gif/issues/13#issuecomment-633244547)
 - [x] 视频（双向）
 - [x] 语音（双向）
+  - [x] AMR / Silk 语音转换
 - [x] 小表情（可显示为文字）
+- [x] 红包提示（QQ -> TG）
 - [x] 链接（双向）
 - [x] JSON/XML 卡片<br>
   （包括部分转化为小程序的链接）
@@ -35,6 +73,7 @@ v2.x 及以上版本同时需要机器人账号以及登录 Telegram 个人账�
   QQ -> TG 按需获取下载地址<br>
   TG -> QQ 将自动转发 20M 以下的小文件
 - [x] 转发多条消息记录
+  - [x] 合并转发网页查看、媒体缓存、嵌套转发预览
 - [x] TG 编辑消息（撤回再重发）
 - [x] 双向撤回消息
 - [x] 戳一戳

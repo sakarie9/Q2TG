@@ -44,7 +44,7 @@ services:
       - cache:/app/.config/QQ/NapCat/temp
 
   q2tg:
-    image: ghcr.io/clansty/q2tg:sleepyfox
+    image: ghcr.io/qi-mooo/q2tg:sleepyfox
     restart: unless-stopped
     depends_on:
       - postgres
@@ -60,6 +60,8 @@ services:
       - TG_API_ID=
       - TG_API_HASH=
       - TG_BOT_TOKEN=
+      # 不需要登录 Telegram UserBot 时可设为 1。部分功能会不可用。
+      #- DISABLE_TG_USERBOT=1
       - DATABASE_URL=postgres://user:password@postgres/db_name
       - NAPCAT_WS_URL=ws://napcat:3001
       - TG_CONNECTION=tcp # 连接 Telegram 的方式，也可以改成 websocket
@@ -72,6 +74,12 @@ services:
       #- CRV_KEY=
       # 要关闭文件上传提示，请取消注释以下变量 https://github.com/clansty/Q2TG/issues/153
       #- DISABLE_FILE_UPLOAD_TIP=1
+      # 可选：将合并转发图片/闪照，以及手动保存的视频，存储到 Cloudflare R2
+      #- R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com/<bucket>
+      #- R2_BUCKET=<bucket>
+      #- R2_ACCESS_KEY_ID=<access-key-id>
+      #- R2_SECRET_ACCESS_KEY=<secret-access-key>
+      #- R2_PUBLIC_URL=https://r2.example.com
       # 如果需要通过代理联网，那么设置下面两个变量
       #- PROXY_IP=
       #- PROXY_PORT=
