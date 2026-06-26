@@ -61,7 +61,7 @@ ENV TGS_TO_GIF=/usr/local/bin/tgs_to_gif
 
 COPY --from=build /app/deploy /app
 COPY main/prisma /app/
-RUN pnpm exec prisma generate
+RUN node ./node_modules/prisma/build/index.js generate
 COPY --from=build /app/ui/dist /app/front
 ENV UI_PATH=/app/front
 
