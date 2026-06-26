@@ -453,13 +453,7 @@ export default class ForwardService {
                   // 处理 helper.downloadToCustomFile 异常
                   this.log.error('下载媒体失败', e);
                   posthog.capture('下载媒体失败', { error: e });
-                  // 下载失败让 Telegram 服务器下载
-                  if (/^https?:\/\//.test(url)) {
-                    files.push(url);
-                  }
-                  else {
-                    message += '\n\n<i>下载失败</i>';
-                  }
+                  message += '\n\n<i>文件下载失败，请使用下方按钮获取下载地址</i>';
                 }
               }
               catch (e) {
