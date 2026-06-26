@@ -1,8 +1,10 @@
 import fs from 'fs';
 import fsP from 'fs/promises';
 import path from 'path';
+import ffmpeg from 'fluent-ffmpeg';
 import { fileTypeFromBuffer, fileTypeFromFile } from 'file-type';
 import mime from 'mime-types';
+import { file as createTempFile, FileResult } from 'tmp-promise';
 import { MessageElem, ForwardMessage, QQEntity } from '../client/QQClient';
 import { fetchFile, getImageUrlByMd5 } from './urls';
 import env from '../models/env';
@@ -39,6 +41,21 @@ const cacheRoot = path.join(env.CACHE_DIR, 'forward-multiple');
 
 const forwardDir = (uuid: string) => path.join(cacheRoot, uuid);
 
+if (env.FFMPEG_PATH) {
+  ffmpeg.setFfmpegPath(env.FFMPEG_PATH);
+}
+if (env.FFPROBE_PATH) {
+  ffmpeg.setFfprobePath(env.FFPROBE_PATH);
+}
+
+const createCacheTempFile = async (options: Parameters<typeof createTempFile>[0] = {}) => {
+  await fsP.mkdir(env.CACHE_DIR, { recursive: true });
+  return createTempFile({
+    tmpdir: env.CACHE_DIR,
+    ...options,
+  });
+};
+
 const publicUrl = (uuid: string, filename: string) =>
   `/Q2tgServlet/ForwardMultipleMedia/${uuid}/${encodeURIComponent(filename)}`;
 
@@ -50,6 +67,15 @@ const getFileExt = async (filePath: string, fallback = 'bin') => {
 const getBufferExt = async (buffer: Buffer, fallback = 'bin') => {
   const type = await fileTypeFromBuffer(buffer).catch(() => undefined);
   return type?.ext || fallback;
+};
+
+const getPathExt = (value: string) => {
+  try {
+    return path.extname(new URL(value).pathname);
+  }
+  catch {
+    return path.extname(value);
+  }
 };
 
 const contentTypeByExt = (ext: string) => mime.lookup(ext) || 'application/octet-stream';
@@ -162,6 +188,73 @@ const saveUrlToR2 = async (uuid: string, cacheKey: string, url: string, fallback
   return await writeBufferToR2(uuid, cacheKey, buffer, fallbackExt);
 };
 
+const saveVideoUrl = async (uuid: string, cacheKey: string, url: string, useR2: boolean) => {
+  const tempFiles: FileResult[] = [];
+  try {
+    const source = await createCacheTempFile({ postfix: getPathExt(url) || '.mp4' });
+    tempFiles.push(source);
+    await fsP.writeFile(source.path, await fetchFile(url));
+    return await saveVideoFile(uuid, cacheKey, source.path, useR2);
+  }
+  finally {
+    await Promise.allSettled(tempFiles.map(item => item.cleanup()));
+  }
+};
+
+const saveVideoFile = async (uuid: string, cacheKey: string, sourcePath: string, useR2: boolean) => {
+  const tempFiles: FileResult[] = [];
+  try {
+    sourcePath = sourcePath.replace(/^file:\/\//, '');
+    const output = await transcodeVideoForWeb(sourcePath);
+    tempFiles.push(output);
+    const filename = filenameByKey(cacheKey, 'mp4');
+    if (useR2) {
+      const key = buildR2MediaKey(uuid, filename);
+      await uploadFileToR2(key, output.path, 'video/mp4');
+      return {
+        filename,
+        localUrl: getR2PublicUrl(key),
+        storage: 'r2' as const,
+      };
+    }
+
+    await fsP.mkdir(forwardDir(uuid), { recursive: true });
+    await fsP.copyFile(output.path, path.join(forwardDir(uuid), filename));
+    return {
+      filename,
+      localUrl: '',
+      storage: 'local' as const,
+    };
+  }
+  finally {
+    await Promise.allSettled(tempFiles.map(item => item.cleanup()));
+  }
+};
+
+const transcodeVideoForWeb = async (sourcePath: string) => {
+  const output = await createCacheTempFile({ postfix: '.mp4' });
+  await fsP.unlink(output.path).catch(() => undefined);
+  await new Promise<void>((resolve, reject) => {
+    ffmpeg(sourcePath)
+      .outputOptions([
+        '-map', '0:v:0',
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        '-f', 'mp4',
+      ])
+      .on('end', () => resolve())
+      .on('error', reject)
+      .save(output.path);
+  });
+  return output;
+};
+
 const writeVoiceAsOgg = async (uuid: string, cacheKey: string, buffer: Buffer) => {
   await fsP.mkdir(forwardDir(uuid), { recursive: true });
   const filename = filenameByKey(cacheKey, 'ogg');
@@ -209,15 +302,9 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
     case 'video': {
       const url = elem.url || (elem.fid ? await qq.getVideoUrl(elem.fid, elem.md5 || '') : typeof elem.file === 'string' ? elem.file : '');
       if (!url) throw new Error('视频下载地址为空');
-      if (useR2) {
-        ({ filename, localUrl } = /^https?:\/\//.test(url)
-          ? await saveUrlToR2(uuid, cacheKey, url, 'mp4')
-          : await copyFileToR2(uuid, cacheKey, url, 'mp4'));
-        storage = 'r2';
-      }
-      else {
-        filename = /^https?:\/\//.test(url) ? await saveFromUrl(uuid, cacheKey, url, 'mp4') : await copyFile(uuid, cacheKey, url, 'mp4');
-      }
+      ({ filename, localUrl, storage } = /^https?:\/\//.test(url)
+        ? await saveVideoUrl(uuid, cacheKey, url, useR2)
+        : await saveVideoFile(uuid, cacheKey, url, useR2));
       break;
     }
     case 'record': {
