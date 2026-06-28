@@ -1244,16 +1244,6 @@ export default class ForwardService {
         }
       }
 
-      if (this.qqClient instanceof QQClient) {
-        chain.push({
-          type: 'mirai',
-          data: JSON.stringify({
-            id: senderId,
-            eqq: { type: 'tg', tgUid: senderId, noSplitSender: this.instance.workMode === 'personal', version: 2 },
-          }, undefined, 0),
-        } as any);
-      }
-
       const sent = await pair.qq.sendMsg(chain, source);
       return [{
         ...sent,
