@@ -205,6 +205,7 @@ const saveVideoFile = async (uuid: string, cacheKey: string, sourcePath: string,
   const tempFiles: FileResult[] = [];
   try {
     sourcePath = sourcePath.replace(/^file:\/\//, '');
+    await assertReadableMediaFile(sourcePath, '视频');
     const output = await transcodeVideoForWeb(sourcePath);
     tempFiles.push(output);
     const filename = filenameByKey(cacheKey, 'mp4');
@@ -228,6 +229,22 @@ const saveVideoFile = async (uuid: string, cacheKey: string, sourcePath: string,
   }
   finally {
     await Promise.allSettled(tempFiles.map(item => item.cleanup()));
+  }
+};
+
+const assertReadableMediaFile = async (filePath: string, mediaName: string) => {
+  try {
+    const stat = await fsP.stat(filePath);
+    if (!stat.isFile()) {
+      throw new Error(`${mediaName}源不是文件：${filePath}`);
+    }
+  }
+  catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM') {
+      throw new Error(`${mediaName}源文件不存在或 q2tg 无法访问：${filePath}`);
+    }
+    throw e;
   }
 };
 

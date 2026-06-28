@@ -10,9 +10,19 @@ import q2tgServlet from './q2tgServlet';
 const log = getLogger('Web Api');
 
 let app = new Elysia()
-  .onError(error => {
-    log.error(error.request.method, error.request.url, error.error.message);
-    log.debug(error.error);
+  .onError(({ code, error, request, set }) => {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error(request.method, request.url, message);
+    log.debug(error);
+    if (code === 'NOT_FOUND') {
+      set.status = 404;
+      return { message: 'Not Found' };
+    }
+    if (code === 'VALIDATION') {
+      set.status = 400;
+      return { message };
+    }
+    return { message };
   })
   .get('/', () => {
     return { hello: 'Q2TG' };

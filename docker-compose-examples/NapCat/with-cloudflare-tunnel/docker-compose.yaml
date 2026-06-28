@@ -54,6 +54,7 @@ services:
       - 8080:8080
     volumes:
       - q2tg:/app/data
+      - napcat-data:/app/.config/QQ:ro
       - cache:/app/.config/QQ/NapCat/temp
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
