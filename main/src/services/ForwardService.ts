@@ -260,8 +260,14 @@ export default class ForwardService {
               }
               else {
                 const member = (pair.qq as Group).pickMember(elem.qq as number);
-                const info = await member.renew();
-                elem.text = `@${info.card || info.nickname}`;
+                try {
+                  const info = await member.renew();
+                  elem.text = `@${info.card || info.nickname}`;
+                }
+                catch (e) {
+                  this.log.warn('获取被 at 群成员信息失败', elem.qq, e);
+                  elem.text = `@${elem.qq}`;
+                }
               }
             }
             if (env.WEB_ENDPOINT && typeof elem.qq === 'number' && !((pair.flags | this.instance.flags) & flags.DISABLE_RICH_HEADER)) {
