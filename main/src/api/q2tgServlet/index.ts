@@ -41,31 +41,39 @@ let app = new Elysia()
       opened: t.Optional(t.Boolean()),
     }),
   })
-  .post('/Q2tgServlet/DownloadForwardMultipleMediaApi', async ({ body }) => {
+  .post('/Q2tgServlet/DownloadForwardMultipleMediaApi', async ({ body, set }) => {
     const requestBody = body as { uuid: string; path: number[] };
     const uuid = requestBody.uuid;
     const indexPath = requestBody.path;
-    const messages = await loadForwardMessages(uuid);
-    const data = await db.forwardMultiple.findFirst({
-      where: { id: uuid },
-    });
-    if (!data) throw new Error('消息记录不存在');
-    const pair = Pair.getByDbId(data.fromPairId);
-    let elem: CachedForwardMessage['message'][number];
     try {
-      elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq);
+      const messages = await loadForwardMessages(uuid);
+      const data = await db.forwardMultiple.findFirst({
+        where: { id: uuid },
+      });
+      if (!data) throw new Error('消息记录不存在');
+      const pair = Pair.getByDbId(data.fromPairId);
+      let elem: CachedForwardMessage['message'][number];
+      try {
+        elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq);
+      }
+      catch (e) {
+        // Video URLs in forwarded messages can expire. Refresh the forward record once and retry.
+        await refreshForwardMedia(uuid, messages, indexPath, data.resId, data.fileName || undefined, data.fromPairId);
+        elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq).catch((retryError) => {
+          const message = retryError instanceof Error ? retryError.message : String(retryError);
+          throw new Error(`保存媒体失败：${message}`);
+        });
+      }
+      await saveForwardMessages(uuid, messages);
+      const cached = isForwardCached(messages);
+      return { elem, messages, cached };
     }
     catch (e) {
-      // Video URLs in forwarded messages can expire. Refresh the forward record once and retry.
-      await refreshForwardMedia(uuid, messages, indexPath, data.resId, data.fileName || undefined, data.fromPairId);
-      elem = await downloadForwardMedia(uuid, messages, indexPath, pair.qq).catch((retryError) => {
-        const message = retryError instanceof Error ? retryError.message : String(retryError);
-        throw new Error(`保存媒体失败：${message}`);
-      });
+      const message = e instanceof Error ? e.message : String(e);
+      log.error('保存合并转发媒体失败', uuid, indexPath, e);
+      set.status = 500;
+      return { message };
     }
-    await saveForwardMessages(uuid, messages);
-    const cached = isForwardCached(messages);
-    return { elem, messages, cached };
   }, {
     body: t.Object({
       uuid: t.String({ format: 'uuid' }),
