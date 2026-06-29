@@ -70,6 +70,11 @@ export default defineComponent({
       if (props.elem.type !== 'video') return '';
       return props.elem.localUrl || props.elem.url || getHttpUrl(props.elem.file) || getHttpUrl(props.elem.fid);
     });
+    const mediaErrorMessage = computed(() =>
+      'downloadStatus' in props.elem && props.elem.downloadStatus === 'unsupported'
+        ? props.elem.downloadError || '媒体源已失效，无法保存到服务器'
+        : '',
+    );
 
     watch(imageCandidates, () => {
       imageSourceIndex.value = 0;
@@ -92,6 +97,9 @@ export default defineComponent({
           currentMediaUrl.value = videoUrl.value;
           currentMediaUrlTitle.value = '视频链接';
         }
+        if ('downloadError' in props.elem && result.data.elem.downloadError) {
+          error.value = result.data.elem.downloadError;
+        }
         if (result.data.messages) {
           updateForwardMultiple?.(result.data.messages, Boolean(result.data.cached));
         }
@@ -105,7 +113,7 @@ export default defineComponent({
     };
 
     const saveButton = () => {
-      if (props.elem.type !== 'video' || props.elem.localUrl) {
+      if (props.elem.type !== 'video' || props.elem.localUrl || props.elem.downloadStatus === 'unsupported') {
         return null;
       }
       return <NButton class="mt-4px" size="tiny" loading={saving.value} onClick={saveMedia}>
@@ -116,6 +124,7 @@ export default defineComponent({
     const mediaWrap = (content: any) => <NSpace vertical size={4}>
       {content}
       {saveButton()}
+      {mediaErrorMessage.value && <div class="text-orange-6 text-12px">{mediaErrorMessage.value}</div>}
       {error.value && <div class="text-red-5 text-12px">{error.value}</div>}
     </NSpace>;
 
@@ -255,7 +264,9 @@ export default defineComponent({
                              style={{ width: 200, height: 200 }}/>;
         case 'video':
           return mediaWrap(<>
-            {videoUrl.value ?
+            {mediaErrorMessage.value ?
+              <div>[视频源已失效]</div> :
+              videoUrl.value ?
               <video src={videoUrl.value} controls width={240}/> :
               <div>[视频]</div>}
             {videoLinkButton()}

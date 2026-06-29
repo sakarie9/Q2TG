@@ -16,6 +16,7 @@ type ImageElem = {
   url?: string
   localUrl?: string
   downloadStatus?: 'idle' | 'cached' | 'unsupported'
+  downloadError?: string
 }
 
 type MediaElem = {
@@ -25,6 +26,7 @@ type MediaElem = {
   url?: string
   localUrl?: string
   downloadStatus?: 'idle' | 'cached' | 'unsupported'
+  downloadError?: string
 }
 
 type FileElem = {
@@ -32,6 +34,7 @@ type FileElem = {
   name: string
   localUrl?: string
   downloadStatus?: 'idle' | 'cached' | 'unsupported'
+  downloadError?: string
 }
 
 type LocationElem = {

@@ -10,6 +10,7 @@ import {
   getElemByPath,
   getImageDownloadSources,
   getMediaFile,
+  normalizeForwardMessages,
   prepareForwardMessages,
 } from '../../utils/forwardMultipleCache';
 import type { ImageDownloadSource } from '../../utils/forwardMultipleCache';
@@ -45,8 +46,9 @@ let app = new Elysia()
     const requestBody = body as { uuid: string; path: number[] };
     const uuid = requestBody.uuid;
     const indexPath = requestBody.path;
+    let messages: CachedForwardMessage[] | undefined;
     try {
-      const messages = await loadForwardMessages(uuid);
+      messages = await loadForwardMessages(uuid);
       const data = await db.forwardMultiple.findFirst({
         where: { id: uuid },
       });
@@ -71,6 +73,11 @@ let app = new Elysia()
     catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log.error('保存合并转发媒体失败', uuid, indexPath, e);
+      if (messages) {
+        await saveForwardMessages(uuid, messages).catch(saveError => {
+          log.warn('保存合并转发媒体失败状态时出错', uuid, saveError);
+        });
+      }
       set.status = 500;
       return { message };
     }
@@ -131,13 +138,21 @@ const loadForwardMessages = async (uuid: string): Promise<CachedForwardMessage[]
     if (!data) throw new Error('消息记录不存在');
 
     if (data.cachedMessages) {
-      forwardCache.set(uuid, data.cachedMessages);
+      const cachedMessages = data.cachedMessages as unknown as CachedForwardMessage[];
+      if (normalizeForwardMessages(cachedMessages)) {
+        await db.forwardMultiple.update({
+          where: { id: uuid },
+          data: { cachedMessages: JSON.parse(JSON.stringify(cachedMessages)) },
+        });
+      }
+      forwardCache.set(uuid, cachedMessages);
     }
     else {
       const pair = Pair.getByDbId(data.fromPairId);
       const messages = await pair.qq.getForwardMsg(data.resId, data.fileName || undefined);
       await processNestedForward(messages, data.fromPairId);
       const cachedMessages = prepareForwardMessages(messages, uuid);
+      normalizeForwardMessages(cachedMessages);
       await db.forwardMultiple.update({
         where: { id: uuid },
         data: { cachedMessages: JSON.parse(JSON.stringify(cachedMessages)) },

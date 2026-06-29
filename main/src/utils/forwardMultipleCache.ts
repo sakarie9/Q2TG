@@ -28,6 +28,7 @@ export type CachedMessageElem = MessageElem & {
   downloadStatus?: 'idle' | 'cached' | 'unsupported';
   downloadName?: string;
   storage?: 'local' | 'r2';
+  downloadError?: string;
 };
 
 export type ImageDownloadSource =
@@ -110,6 +111,14 @@ const prepareElem = (elem: MessageElem, uuid: string): CachedMessageElem => {
   const cacheKey = buildMediaKey(elem);
   if (!cacheKey) return elem as CachedMessageElem;
 
+  const cachedElem = elem as CachedMessageElem;
+  if (cachedElem.downloadStatus === 'cached' && cachedElem.localUrl) {
+    return {
+      ...cachedElem,
+      cacheKey,
+    };
+  }
+
   const existing = findCachedMedia(uuid, cacheKey);
   if (existing) {
     return {
@@ -127,6 +136,32 @@ const prepareElem = (elem: MessageElem, uuid: string): CachedMessageElem => {
     cacheKey,
     downloadStatus: 'idle',
   } as CachedMessageElem;
+};
+
+export const normalizeForwardMessages = (messages: CachedForwardMessage[]) => {
+  let changed = false;
+  for (const message of messages) {
+    for (const elem of message.message) {
+      if (elem.type !== 'video' || elem.localUrl || hasHttpMediaSource(elem)) continue;
+      const sourcePath = getLocalMediaSource(elem);
+      if (!sourcePath) continue;
+      if (fs.existsSync(sourcePath)) {
+        if (elem.downloadStatus === 'unsupported') {
+          elem.downloadStatus = 'idle';
+          delete elem.downloadError;
+          changed = true;
+        }
+        continue;
+      }
+      const error = missingVideoSourceMessage(sourcePath);
+      if (elem.downloadStatus !== 'unsupported' || elem.downloadError !== error) {
+        elem.downloadStatus = 'unsupported';
+        elem.downloadError = error;
+        changed = true;
+      }
+    }
+  }
+  return changed;
 };
 
 export const findCachedMedia = (uuid: string, cacheKey: string) => {
@@ -242,7 +277,7 @@ const assertReadableMediaFile = async (filePath: string, mediaName: string) => {
   catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM') {
-      throw new Error(`${mediaName}源文件不存在或 q2tg 无法访问：${filePath}`);
+      throw new Error(mediaName === '视频' ? missingVideoSourceMessage(filePath) : `${mediaName}源文件不存在或 q2tg 无法访问：${filePath}`);
     }
     throw e;
   }
@@ -319,6 +354,15 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
     case 'video': {
       const url = elem.url || (elem.fid ? await qq.getVideoUrl(elem.fid, elem.md5 || '') : typeof elem.file === 'string' ? elem.file : '');
       if (!url) throw new Error('视频下载地址为空');
+      if (!/^https?:\/\//.test(url)) {
+        const sourcePath = normalizeFilePath(url);
+        if (sourcePath && !fs.existsSync(sourcePath)) {
+          const message = missingVideoSourceMessage(sourcePath);
+          elem.downloadStatus = 'unsupported';
+          elem.downloadError = message;
+          throw new Error(message);
+        }
+      }
       ({ filename, localUrl, storage } = /^https?:\/\//.test(url)
         ? await saveVideoUrl(uuid, cacheKey, url, useR2)
         : await saveVideoFile(uuid, cacheKey, url, useR2));
@@ -342,6 +386,7 @@ export const downloadForwardMedia = async (uuid: string, messages: CachedForward
   elem.downloadStatus = 'cached';
   elem.downloadName = filename;
   elem.storage = storage;
+  delete elem.downloadError;
   return elem;
 };
 
@@ -482,3 +527,30 @@ export const getElemByPath = (messages: CachedForwardMessage[], indexPath: numbe
   const [messageIndex, elemIndex] = indexPath;
   return messages[messageIndex]?.message?.[elemIndex] as CachedMessageElem | undefined;
 };
+
+const hasHttpMediaSource = (elem: CachedMessageElem) =>
+  isHttpUrl(getStringField(elem, 'url'))
+  || isHttpUrl(getStringField(elem, 'file'))
+  || isHttpUrl(getStringField(elem, 'fid'));
+
+const getLocalMediaSource = (elem: CachedMessageElem) =>
+  normalizeFilePath(getStringField(elem, 'url'))
+  || normalizeFilePath(getStringField(elem, 'file'))
+  || normalizeFilePath(getStringField(elem, 'fid'));
+
+const getStringField = (elem: CachedMessageElem, key: string) => {
+  const value = (elem as unknown as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : '';
+};
+
+const normalizeFilePath = (value?: string) => {
+  if (!value || isHttpUrl(value)) return '';
+  const filePath = value.replace(/^file:\/\//, '');
+  return path.isAbsolute(filePath) ? filePath : '';
+};
+
+const isHttpUrl = (value?: string) =>
+  typeof value === 'string' && /^https?:\/\//i.test(value);
+
+const missingVideoSourceMessage = (filePath: string) =>
+  `视频源文件不存在或已被 QQ/NapCat 清理，无法保存到服务器：${filePath}`;
