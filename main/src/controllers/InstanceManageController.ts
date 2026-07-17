@@ -27,7 +27,7 @@ export default class InstanceManageController {
         message: `正在创建，请稍候`,
       });
       const newInstance = await Instance.createNew(messageSplit[1]);
-      this.log.info(`已创建新的实例 实例 ID: ${newInstance.id} Bot Token: ${messageSplit[1]}`);
+      this.log.info(`已创建新的实例 实例 ID: ${newInstance.id}`);
       await message.reply({
         message: `已创建新的实例\n实例 ID: ${newInstance.id}`,
         buttons: Button.url('去配置', `https://t.me/${newInstance.botMe.username}?start=setup`),

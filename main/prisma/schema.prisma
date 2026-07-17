@@ -35,6 +35,7 @@ model Entity {
 
 model Instance {
   id            Int           @id @default(autoincrement())
+  botToken      String?
   owner         BigInt        @default(0)
   workMode      String        @default("")
   isSetup       Boolean       @default(false)

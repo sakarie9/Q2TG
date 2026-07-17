@@ -16,6 +16,7 @@ import { IterMessagesParams } from 'telegram/client/messages';
 import { PromisedNetSockets, PromisedWebSockets } from 'telegram/extensions';
 import { ConnectionTCPFull, ConnectionTCPObfuscated } from 'telegram/network';
 import env from '../models/env';
+import { getLogger } from 'log4js';
 
 type MessageHandler = (message: Api.Message) => Promise<boolean | void>;
 type ServiceMessageHandler = (message: Api.MessageService) => Promise<boolean | void>;
@@ -32,6 +33,7 @@ export default class Telegram {
   public me: Api.User;
 
   private static existedBots = {} as { [id: number]: Telegram };
+  private static readonly log = getLogger('Telegram');
 
   public get sessionId() {
     return (this.client.session as TelegramSession).dbId;
@@ -117,6 +119,38 @@ export default class Telegram {
       await bot.disconnect().catch(() => 0);
       throw e;
     }
+  }
+
+  public static async connectBot(sessionId: number, botAuthToken: string, appName = 'Q2TG') {
+    try {
+      return await this.connect(sessionId, appName);
+    }
+    catch (e) {
+      if (!this.isAuthKeyDuplicated(e)) throw e;
+      this.log.warn(`Bot session ${sessionId} 的 auth key 已重复，正在重新授权`);
+    }
+
+    const bot = new this(appName, sessionId);
+    try {
+      await (bot.client.session as TelegramSession).resetAuthKey();
+      await bot.client.start({ botAuthToken });
+      await bot.config();
+      this.existedBots[sessionId] = bot;
+      this.log.info(`Bot session ${sessionId} 已自动恢复`);
+      return bot;
+    }
+    catch (e) {
+      delete this.existedBots[sessionId];
+      await bot.disconnect().catch(() => 0);
+      throw e;
+    }
+  }
+
+  private static isAuthKeyDuplicated(error: unknown) {
+    if (!error || typeof error !== 'object') return false;
+    const rpcError = error as { errorMessage?: unknown; message?: unknown };
+    return rpcError.errorMessage === 'AUTH_KEY_DUPLICATED'
+      || (typeof rpcError.message === 'string' && rpcError.message.includes('AUTH_KEY_DUPLICATED'));
   }
 
   public async disconnect() {

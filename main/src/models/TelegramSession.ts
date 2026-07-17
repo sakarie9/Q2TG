@@ -91,6 +91,15 @@ export default class TelegramSession extends MemorySession {
     return this._authKey;
   }
 
+  public async resetAuthKey() {
+    this.log.warn('清除失效的 auth key');
+    this._authKey = undefined;
+    await db.session.update({
+      where: { id: this._dbId },
+      data: { authKey: null },
+    });
+  }
+
   processEntities(tlo: any) {
     this.log.trace('processEntities');
     const entitiesSet = this._entitiesToRows(tlo);

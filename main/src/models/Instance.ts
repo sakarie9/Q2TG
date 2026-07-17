@@ -34,6 +34,7 @@ export default class Instance {
 
   private _owner = 0;
   private _isSetup = false;
+  private _botToken?: string;
   private _workMode = '';
   private _botSessionId = 0;
   private _userSessionId = 0;
@@ -90,6 +91,7 @@ export default class Instance {
     }
 
     this._owner = Number(dbEntry.owner);
+    this._botToken = dbEntry.botToken;
     this._qq = dbEntry.qqBot;
     this._botSessionId = dbEntry.botSessionId;
     this._userSessionId = dbEntry.userSessionId;
@@ -101,11 +103,13 @@ export default class Instance {
   private init(botToken?: string) {
     (async () => {
       this.log.debug('正在登录 TG Bot');
+      const token = this.id === 0 ? env.TG_BOT_TOKEN : botToken || this._botToken;
       if (this.botSessionId) {
-        this.tgBot = await Telegram.connect(this._botSessionId);
+        this.tgBot = token
+          ? await Telegram.connectBot(this._botSessionId, token)
+          : await Telegram.connect(this._botSessionId);
       }
       else {
-        const token = this.id === 0 ? env.TG_BOT_TOKEN : botToken;
         if (!token) {
           throw new Error('botToken 未指定');
         }
@@ -254,7 +258,7 @@ export default class Instance {
   }
 
   public static async createNew(botToken: string) {
-    const dbEntry = await db.instance.create({ data: {} });
+    const dbEntry = await db.instance.create({ data: { botToken } });
     return await this.start(dbEntry.id, botToken);
   }
 
