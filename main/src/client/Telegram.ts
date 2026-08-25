@@ -24,6 +24,10 @@ type ChannelUserTypingHandler = (event: Api.UpdateChannelUserTyping) => Promise<
 
 export default class Telegram {
   private readonly client: TelegramClient;
+  private botAuthToken?: string;
+  private recoveryPromise?: Promise<void>;
+  private recovering = false;
+  private configured = false;
   private waitForMessageHelper: WaitForMessageHelper;
   private callbackQueryHelper: CallbackQueryHelper = new CallbackQueryHelper();
   private readonly onMessageHandlers: Array<MessageHandler> = [];
@@ -68,10 +72,14 @@ export default class Telegram {
       },
     );
     this.client.logger.setLevel(env.TG_LOG_LEVEL as LogLevel);
+    this.installRuntimeRecovery();
   }
 
   public static async create(startArgs: UserAuthParams | BotAuthParams, appName = 'Q2TG') {
     const bot = new this(appName);
+    bot.botAuthToken = 'botAuthToken' in startArgs && typeof startArgs.botAuthToken === 'string'
+      ? startArgs.botAuthToken
+      : undefined;
     try {
       await bot.client.start(startArgs);
       await bot.config();
@@ -123,7 +131,9 @@ export default class Telegram {
 
   public static async connectBot(sessionId: number, botAuthToken: string, appName = 'Q2TG') {
     try {
-      return await this.connect(sessionId, appName);
+      const bot = await this.connect(sessionId, appName);
+      bot.botAuthToken = botAuthToken;
+      return bot;
     }
     catch (e) {
       if (!this.isAuthKeyDuplicated(e)) throw e;
@@ -131,6 +141,7 @@ export default class Telegram {
     }
 
     const bot = new this(appName, sessionId);
+    bot.botAuthToken = botAuthToken;
     try {
       await (bot.client.session as TelegramSession).resetAuthKey();
       await bot.client.start({ botAuthToken });
@@ -153,6 +164,51 @@ export default class Telegram {
       || (typeof rpcError.message === 'string' && rpcError.message.includes('AUTH_KEY_DUPLICATED'));
   }
 
+  private installRuntimeRecovery() {
+    const client = this.client as any;
+    const methods = [
+      'invoke', 'sendMessage', 'sendFile', 'uploadFile', 'getEntity', 'getInputEntity',
+      'getMessages', 'downloadFile', 'downloadProfilePhoto', 'getMe',
+    ];
+    for (const method of methods) {
+      const original = client[method];
+      if (typeof original !== 'function') continue;
+      client[method] = async (...args: any[]) => this.runWithRecovery(() => original.apply(client, args));
+    }
+  }
+
+  private async runWithRecovery<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    }
+    catch (e) {
+      if (this.recovering || !this.botAuthToken || !Telegram.isAuthKeyDuplicated(e)) throw e;
+      await this.recoverAuthKey();
+      return await operation();
+    }
+  }
+
+  private async recoverAuthKey() {
+    if (this.recoveryPromise) return await this.recoveryPromise;
+    this.recoveryPromise = (async () => {
+      this.recovering = true;
+      Telegram.log.warn(`Bot session ${this.sessionId} 运行中检测到重复 auth key，正在自动恢复`);
+      await this.client.disconnect().catch(() => 0);
+      await (this.client.session as TelegramSession).resetAuthKey();
+      await this.client.start({ botAuthToken: this.botAuthToken! });
+      await this.config();
+      Telegram.log.info(`Bot session ${this.sessionId} 运行时自动恢复完成`);
+      this.recovering = false;
+    })();
+    try {
+      await this.recoveryPromise;
+    }
+    finally {
+      this.recovering = false;
+      this.recoveryPromise = undefined;
+    }
+  }
+
   public async disconnect() {
     await this.client.disconnect();
   }
@@ -160,6 +216,10 @@ export default class Telegram {
   private async config() {
     this.client.setParseMode('html');
     this.waitForMessageHelper = new WaitForMessageHelper(this);
+    if (this.configured) {
+      this.me = await this.client.getMe() as Api.User;
+      return;
+    }
     this.client.addEventHandler(this.onMessage, new NewMessage({}));
     this.client.addEventHandler(this.onEditedMessage, new EditedMessage({}));
     this.client.addEventHandler(this.onServiceMessage, new Raw({
@@ -170,6 +230,7 @@ export default class Telegram {
       types: [Api.UpdateChannelUserTyping],
     }));
     this.client.addEventHandler(this.callbackQueryHelper.onCallbackQuery, new CallbackQuery());
+    this.configured = true;
     this.me = await this.client.getMe() as Api.User;
   }
 
