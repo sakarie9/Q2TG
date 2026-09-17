@@ -64,12 +64,12 @@ export default class ForwardController {
       if ((pair.flags | this.instance.flags) & flags.DISABLE_Q2TG) return;
       // 如果是多张图片的话，是一整条消息，只过一次，所以不受这个判断影响
       // 防止私聊消息重复
+      // 注意：NapCat 下 rand 被复用为真实 msg_seq（real_seq），不能再作为去重条件
       let existed = event.dm && await db.message.findFirst({
         where: {
           qqRoomId: pair.qqRoomId,
           qqSenderId: event.from.id,
           seq: event.seq,
-          rand: event.rand,
           pktnum: event.pktnum,
           time: event.time,
           instanceId: this.instance.id,

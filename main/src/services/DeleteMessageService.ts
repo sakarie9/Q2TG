@@ -156,7 +156,7 @@ export default class DeleteMessageService {
       const message = await db.message.findFirst({
         where: {
           seq: event.seq,
-          rand: event.rand,
+          // NapCat 下 rand 被复用为真实 msg_seq（real_seq），撤回事件里没有该值，不能作为查询条件
           qqRoomId: pair.qqRoomId,
           instanceId: this.instance.id,
         },

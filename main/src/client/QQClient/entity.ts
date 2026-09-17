@@ -140,6 +140,10 @@ export type Sendable = SendableElem | string | (SendableElem | string)[];
 export interface Quotable {
   message: MessageElem[] | MessageElem | string;
   seq: number;
+  /**
+   * NapCat 没有真正的 rand，这个字段被复用来携带真实的 msg_seq（real_seq），
+   * 用于在 NapCat 重启、msg_id 短 ID 映射失效后仍能构建引用回复。
+   */
   rand?: number;
   time?: number;
   user_id: number;

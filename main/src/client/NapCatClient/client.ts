@@ -141,12 +141,16 @@ export class NapCatClient extends QQClient {
       chat,
       napCatReceiveToMessageElems(message, data.raw_message),
       data.message_id,
-      0, 0,
+      // NapCat 的 message_id 只是 msg_id 的短 ID 哈希，进程重启后映射会丢失。
+      // real_seq 是真实的 msg_seq，持久有效，用它构建引用回复才能在重启后正常工作。
+      // 这里复用 Quotable/MessageEvent 的 rand 字段来携带它（NapCat 没有真正的 rand，一直是 0）。
+      Number((data as any).real_seq) || 0,
+      0,
       data.time,
       data.raw_message,
       replyMessage ? {
         message: napCatReceiveToMessageElems((replyMessage as any).message.filter(it => it.type !== 'reply'), replyMessage.raw_message),
-        rand: 0, fromId: replyMessage.sender.user_id, seq: replyMessage.message_id, time: replyMessage.time,
+        rand: Number((replyMessage as any).real_seq) || 0, fromId: replyMessage.sender.user_id, seq: replyMessage.message_id, time: replyMessage.time,
       } : undefined,
       undefined,
       data.message_id.toString(),

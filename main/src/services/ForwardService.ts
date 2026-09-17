@@ -1026,7 +1026,7 @@ export default class ForwardService {
               message: message.replyTo?.quoteText || '回复消息找不到',
               seq: 1,
               time: Math.floor(new Date().getTime() / 1000),
-              rand: 1,
+              rand: 0,
               user_id: this.qqClient.uin,
             };
           }
@@ -1038,7 +1038,7 @@ export default class ForwardService {
             message: '查找回复消息失败',
             seq: 1,
             time: Math.floor(new Date().getTime() / 1000),
-            rand: 1,
+            rand: 0,
             user_id: this.qqClient.uin,
           };
         }
@@ -1226,7 +1226,7 @@ export default class ForwardService {
               message: firstMessage.replyTo?.quoteText || '回复消息找不到',
               seq: 1,
               time: Math.floor(new Date().getTime() / 1000),
-              rand: 1,
+              rand: 0,
               user_id: this.qqClient.uin,
             };
           }
@@ -1238,7 +1238,7 @@ export default class ForwardService {
             message: '查找回复消息失败',
             seq: 1,
             time: Math.floor(new Date().getTime() / 1000),
-            rand: 1,
+            rand: 0,
             user_id: this.qqClient.uin,
           };
         }
