@@ -60,6 +60,24 @@ export abstract class NapCatEntity implements QQEntity {
 
   protected abstract sendMsgImpl(message: SendMessageSegment[], extra?: Record<string, any>): Promise<MessageRet>;
 
+  /**
+   * OneBot 的发送接口只返回短 ID（message_id），不带真实 msg_seq。
+   * 所以发送成功后立刻用 get_msg 把真实 msg_seq 取回来：此时短 ID 到 msgId 的映射
+   * 一定还在 NapCat 内存里，查询是可靠的。取回后存进 rand，之后引用这条消息就能带上
+   * seq，即使 NapCat 重启也不受影响。
+   * @returns 真实的 msg_seq，取不到时返回 0（退回只带 id 的旧行为）
+   */
+  protected async fetchRealSeq(messageId: number): Promise<number> {
+    try {
+      const data = await this.client.callApi('get_msg', { message_id: messageId });
+      return Number((data as { real_seq?: number | string; } | undefined)?.real_seq) || 0;
+    }
+    catch (e) {
+      this.logger.warn('获取消息真实 msg_seq 失败，该消息的引用回复在 NapCat 重启后可能失效', messageId, e);
+      return 0;
+    }
+  }
+
   async sendMsg(content: Sendable, source?: Quotable, isSpoiler?: boolean): Promise<MessageRet> {
     if (!Array.isArray(content)) {
       content = [content];
@@ -81,7 +99,8 @@ export abstract class NapCatEntity implements QQEntity {
       // 优先使用真实的 msg_seq 构建引用回复：NapCat 重启后 msg_id 的短 ID 映射会丢失，
       // 只带 id 的 reply 段会被 NapCat 直接丢弃（在 QQ 端看不到引用）。
       // seq 是服务端持久有效的，NapCat 会通过 seq 重新拉取原消息。
-      // 没有 msg_seq 的历史数据无法找回原消息，只能退回只带 id 的旧行为。
+      // rand 里的 msg_seq 来自收到的消息事件，或发送成功后 fetchRealSeq 的补充查询；
+      // 升级前入库、没有 msg_seq 的旧消息只能退回只带 id 的旧行为。
       const realSeq = Number(source.rand) || 0;
       message.unshift({
         type: 'reply',
@@ -124,7 +143,7 @@ abstract class NapCatUser extends NapCatEntity implements QQUser {
       message_id: data.message_id.toString(),
       seq: data.message_id,
       time: Date.now() / 1000,
-      rand: 0,
+      rand: await this.fetchRealSeq(data.message_id),
     };
   }
 
@@ -248,7 +267,7 @@ export class NapCatGroup extends NapCatEntity implements Group {
       message_id: data.message_id.toString(),
       seq: data.message_id,
       time: Date.now() / 1000,
-      rand: 0,
+      rand: await this.fetchRealSeq(data.message_id),
     };
   }
 
