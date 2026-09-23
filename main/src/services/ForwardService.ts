@@ -981,7 +981,8 @@ export default class ForwardService {
               asface: true,
             });
           }
-          chain.push(messageLeft, ...newChain);
+          if (messageLeft) chain.push(messageLeft);
+          chain.push(...newChain.filter(it => it !== ''));
           brief += message.message;
         }
         // Q2TG Bot 转发的消息目前不会包含 custom emoji
@@ -989,7 +990,8 @@ export default class ForwardService {
           // 复读了某一条来自 QQ 的消息 (Repeat as forward)
           const originalMessage = message.message.includes('\n') ?
             message.message.substring(message.message.indexOf('\n') + 1) : '';
-          useText(originalMessage);
+          // 整行只有头部、没有正文时会剥出空串，不能再往链里塞空 text
+          if (originalMessage) useText(originalMessage);
           brief += originalMessage;
 
           messageHeader = helper.getUserDisplayName(message.sender) + ' 转发自 ' +
