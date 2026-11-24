@@ -151,8 +151,20 @@ export default class ForwardService {
             messages = await pair.qq.getForwardMsg(resId, fileName);
           }
           catch (e) {
-            posthog.capture('转发多条消息（无法获取）', { error: e });
-            message = '[<i>转发多条消息（无法获取）</i>]';
+            // 部分协议端（如 SnowLuma）的转发卡片只有 m_fileName，尝试补上 MultiMsg_ 前缀
+            if (fileName && resId === fileName && !/^MultiMsg_/i.test(fileName)) {
+              try {
+                messages = await pair.qq.getForwardMsg(`MultiMsg_${fileName}`, fileName);
+                resId = `MultiMsg_${fileName}`;
+              }
+              catch {
+                // 忽略，按下面的失败逻辑处理
+              }
+            }
+            if (!messages) {
+              posthog.capture('转发多条消息（无法获取）', { error: e });
+              message = '[<i>转发多条消息（无法获取）</i>]';
+            }
           }
         }
         if (messages)
@@ -550,7 +562,7 @@ export default class ForwardService {
                 }
                 break;
               case 'forward':
-                await useForward(result.resId);
+                await useForward(result.resId, result.fileName);
                 break;
             }
             break messageElemLoop;

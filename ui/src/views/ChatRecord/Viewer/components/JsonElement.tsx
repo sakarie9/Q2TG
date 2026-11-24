@@ -155,7 +155,7 @@ const summarizeMessage = (message: ForwardMessage) => {
           return '[JSON 卡片]';
         }
       case 'xml':
-        return '[XML 卡片]';
+        return /viewMultiMsg/i.test(elem.data) ? '[合并转发]' : '[XML 卡片]';
       case 'location':
         return `[位置] ${elem.name || elem.address || ''}`;
       default:

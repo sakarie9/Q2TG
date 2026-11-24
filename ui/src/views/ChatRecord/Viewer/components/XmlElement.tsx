@@ -14,7 +14,7 @@ export default defineComponent({
       if (urlRegex.test(props.xml))
         appurl = props.xml.match(urlRegex)![1].replace(/\\\//g, '/');
       if (props.xml.includes('action="viewMultiMsg"')) {
-        return <div>[Forward multiple messages]</div>;
+        return <div>[合并转发]</div>;
       }
       else if (appurl) {
         appurl = appurl.replace(/&amp;/g, '&');

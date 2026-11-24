@@ -3,7 +3,7 @@ import { CustomFile } from 'telegram/client/uploads';
 import { base64decode } from 'nodejs-base64';
 import { getLogger } from 'log4js';
 import { Entity } from 'telegram/define';
-import { ForwardMessage } from '../client/QQClient';
+import { ForwardMessage, MessageElem } from '../client/QQClient';
 import { Api } from 'telegram';
 import { imageSize } from 'image-size';
 import env from '../models/env';
@@ -24,6 +24,75 @@ const htmlEscape = (text: string) =>
   text.replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+const readXmlAttribute = (xml: string, name: string) => {
+  const match = new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i').exec(xml);
+  return (match?.[1] ?? match?.[2] ?? '').trim();
+};
+
+const elemToPreviewText = (elem: MessageElem): string => {
+  switch (elem.type) {
+    case 'text':
+      return elem.text;
+    case 'markdown':
+      return elem.content;
+    case 'at':
+      return elem.text || `@${elem.qq}`;
+    case 'face':
+    case 'sface':
+      return elem.text ? `[${elem.text}]` : '[表情]';
+    case 'bface':
+      return '[表情]';
+    case 'image':
+      return elem.asface ? '[表情]' : '[图片]';
+    case 'flash':
+      return '[闪照]';
+    case 'record':
+      return '[语音]';
+    case 'video':
+      return '[视频]';
+    case 'file':
+      return `[文件]${elem.name || ''}`;
+    case 'location':
+      return '[位置]';
+    case 'share':
+      return elem.title || '[分享]';
+    case 'json': {
+      try {
+        const parsed = JSON.parse(elem.data);
+        if (parsed?.type === 'forward' || parsed?.app === 'com.tencent.multimsg') return '[聊天记录]';
+      }
+      catch {
+        // 忽略无法解析的卡片
+      }
+      return '[卡片消息]';
+    }
+    case 'xml':
+      return /viewMultiMsg/i.test(elem.data) ? '[聊天记录]' : '[XML 卡片]';
+    case 'forward':
+    case 'node':
+      return '[聊天记录]';
+    case 'poke':
+      return '[戳一戳]';
+    case 'rps':
+      return '[猜拳]';
+    case 'dice':
+      return '[骰子]';
+    default:
+      return '';
+  }
+};
+
+// 部分协议端（如 SnowLuma）的 get_forward_msg 不返回 raw_message，
+// 预览必须从结构化消息段生成。
+const getForwardMessageBrief = (message: ForwardMessage) => {
+  const fromElems = (message.message || [])
+    .map(elemToPreviewText)
+    .filter(Boolean)
+    .join('');
+  const brief = fromElems || (message.raw_message || '').trim() || '[消息]';
+  return brief.length > 10 ? brief.substring(0, 10) + '…' : brief;
+};
 
 const isRedPacketJson = (jsonObj: any, raw: string) =>
   /qwallet|red.?bag|red.?packet|hong.?bao|红包/i.test(`${jsonObj?.app || ''} ${raw}`);
@@ -242,22 +311,32 @@ export default {
   },
 
   processXml(xml: string):
-    { type: 'forward', resId: string } | { type: 'text', text: string } | { type: 'image', md5: string } {
+    { type: 'forward', resId: string, fileName?: string } | { type: 'text', text: string } | { type: 'image', md5: string } {
     const urlRegex = /url="([^"]+)"/;
     const md5ImageRegex = /image md5="([A-F\d]{32})"/;
     let text: string;
     if (urlRegex.test(xml))
       text = xml.match(urlRegex)[1].replace(/\\\//g, '/');
-    if (xml.includes('action="viewMultiMsg"')) {
-      text = '[Forward multiple messages]';
-      const resIdRegex = /m_resid="([\w+=/]+)"/;
-      if (resIdRegex.test(xml)) {
-        const resId = xml.match(resIdRegex)![1];
+    if (xml.includes('action="viewMultiMsg"') || readXmlAttribute(xml, 'action') === 'viewMultiMsg') {
+      const resId = readXmlAttribute(xml, 'm_resid');
+      const fileName = readXmlAttribute(xml, 'm_fileName');
+      // 部分协议端（如 SnowLuma）的嵌套转发 m_resid 为空，只带 m_fileName。
+      // 把 fileName 作为候选返回，由调用方依次尝试获取。
+      if (resId) {
         return {
           type: 'forward',
           resId,
+          fileName: fileName || undefined,
         };
       }
+      if (fileName) {
+        return {
+          type: 'forward',
+          resId: fileName,
+          fileName,
+        };
+      }
+      text = '[聊天记录]';
     }
     else if (text) {
       text = text.replace(/&amp;/g, '&');
@@ -279,6 +358,10 @@ export default {
         text: '[XML]',
       };
     }
+    return {
+      type: 'text',
+      text: text || '[聊天记录]',
+    };
   },
 
   getUserDisplayName(user: Entity) {
@@ -308,8 +391,8 @@ export default {
     messages = messages.slice(0, 4);
     let result = '<b>转发的消息记录</b>';
     for (const message of messages) {
-      result += `\n<b>${message.nickname}: </b>` +
-        `${htmlEscape(message.raw_message.length > 10 ? message.raw_message.substring(0, 10) + '…' : message.raw_message)}`;
+      result += `\n<b>${htmlEscape(message.nickname || '未知')}: </b>` +
+        `${htmlEscape(getForwardMessageBrief(message))}`;
     }
     if (count > messages.length) {
       result += `\n<b>共 ${count} 条消息记录</b>`;
